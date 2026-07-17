@@ -1,0 +1,44 @@
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: cutcal-db
+    environment:
+      ACCEPT_EULA: Y
+      SA_PASSWORD: ${DB_SA_PASSWORD}
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: cutcal-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  api:
+    build:
+      context: .
+      dockerfile: CutCal.WebAPI/Dockerfile
+    container_name: cutcal-api
+    ports:
+      - "5194:5194"
+    depends_on:
+      - db
+      - rabbitmq
+    env_file: .env
+    environment:
+      ASPNETCORE_URLS: "http://+:5194"
+
+  worker:
+    build:
+      context: .
+      dockerfile: CutCal.Worker/Dockerfile
+    container_name: cutcal-worker
+    depends_on:
+      - rabbitmq
+    env_file: .env
+
+volumes:
+  sqlserver_data:

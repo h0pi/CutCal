@@ -1,0 +1,47 @@
+# ===== Secrets =====
+.env
+*.env.local
+!.env.example
+
+# ===== .NET =====
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.pdb
+
+# ===== Flutter / Dart (applies under UI/cutcal_mobile and UI/cutcal_desktop) =====
+**/build/
+**/.dart_tool/
+**/.packages
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.pub-cache/
+**/.pub/
+
+# Android
+**/android/local.properties
+**/android/.gradle/
+**/android/key.properties
+**/android/**/*.jks
+**/android/**/*.keystore
+
+# Windows desktop build artifacts
+**/windows/flutter/ephemeral/
+**/windows/flutter/generated_plugin_registrant.cc
+**/windows/flutter/generated_plugin_registrant.h
+**/windows/flutter/generated_plugins.cmake
+
+# IDE project files
+.idea/
+*.iml
+.vscode/
+
+# ===== Runtime-uploaded content (never commit user-generated uploads) =====
+CutCal.WebAPI/wwwroot/uploads/
+
+# ===== OS junk =====
+.DS_Store
+Thumbs.db
+Desktop.ini
