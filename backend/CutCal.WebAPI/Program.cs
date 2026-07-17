@@ -14,14 +14,18 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
-var envPath = Path.Combine(Directory.GetCurrentDirectory(), "..", ".env");
-if (File.Exists(envPath))
+// Walk up from the current directory looking for the repo-root .env file. This works
+// whether `dotnet run` is launched from the repo root or from inside backend/CutCal.WebAPI.
+var envDir = new DirectoryInfo(Directory.GetCurrentDirectory());
+for (var i = 0; i < 5 && envDir is not null; i++)
 {
-    DotNetEnv.Env.Load(envPath);
-}
-else if (File.Exists(".env"))
-{
-    DotNetEnv.Env.Load(".env");
+    var candidate = Path.Combine(envDir.FullName, ".env");
+    if (File.Exists(candidate))
+    {
+        DotNetEnv.Env.Load(candidate);
+        break;
+    }
+    envDir = envDir.Parent;
 }
 
 var builder = WebApplication.CreateBuilder(args);

@@ -4,11 +4,11 @@ Appointment booking platform for hair and beauty salons.
 
 ## Architecture
 
-- `CutCal.Model` — DTOs, requests, responses, search objects, exceptions
-- `CutCal.Services` — database entities, `CutCalDbContext`, business services, state machine, validators
-- `CutCal.Common.Services` — `CryptoService` (password hashing)
-- `CutCal.WebAPI` — controllers, filters, JWT auth, Swagger
-- `CutCal.Worker` — separate microservice, consumes RabbitMQ and sends emails
+- `backend/CutCal.Model` — DTOs, requests, responses, search objects, exceptions
+- `backend/CutCal.Services` — database entities, `CutCalDbContext`, business services, state machine, validators
+- `backend/CutCal.Common.Services` — `CryptoService` (password hashing)
+- `backend/CutCal.WebAPI` — controllers, filters, JWT auth, Swagger
+- `backend/CutCal.Worker` — separate microservice, consumes RabbitMQ and sends emails
 - `UI/cutcal_mobile` — Flutter mobile app (Android)
 - `UI/cutcal_desktop` — Flutter desktop app (Windows)
 
@@ -38,6 +38,7 @@ Secrets are read from `.env` (see `.env.example`). Nothing is hardcoded in `apps
 ## Running the backend locally without Docker
 
 ```bash
+cd backend
 dotnet restore
 dotnet run --project CutCal.WebAPI
 ```

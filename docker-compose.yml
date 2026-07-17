@@ -19,7 +19,7 @@ services:
 
   api:
     build:
-      context: .
+      context: ./backend
       dockerfile: CutCal.WebAPI/Dockerfile
     container_name: cutcal-api
     ports:
@@ -33,7 +33,7 @@ services:
 
   worker:
     build:
-      context: .
+      context: ./backend
       dockerfile: CutCal.Worker/Dockerfile
     container_name: cutcal-worker
     depends_on:

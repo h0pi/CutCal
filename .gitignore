@@ -39,7 +39,7 @@ obj/
 .vscode/
 
 # ===== Runtime-uploaded content (never commit user-generated uploads) =====
-CutCal.WebAPI/wwwroot/uploads/
+backend/CutCal.WebAPI/wwwroot/uploads/
 
 # ===== OS junk =====
 .DS_Store
