@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
@@ -6,8 +8,10 @@ import '../../providers/entity_providers.dart';
 import '../../utils/utils_widgets.dart';
 import 'salon_detail_screen.dart';
 
-// TODO: replace the placeholder list below with a real google_maps_flutter
-// GoogleMap widget rendering a Marker per salon, once an API key is configured.
+// Default camera fallback (Sarajevo) used when location permission is denied
+// or unavailable, so the map still opens somewhere sensible.
+const _fallbackCenter = LatLng(43.8563, 18.4131);
+
 class SalonMapScreen extends StatefulWidget {
   const SalonMapScreen({super.key});
 
@@ -20,11 +24,35 @@ class _SalonMapScreenState extends State<SalonMapScreen> {
   int? _selectedCategoryId;
   List<SalonModel> _salons = [];
   bool _isLoading = true;
+  GoogleMapController? _mapController;
+  LatLng _initialCenter = _fallbackCenter;
 
   @override
   void initState() {
     super.initState();
+    _determineInitialCenter();
     _load();
+  }
+
+  Future<void> _determineInitialCenter() async {
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        return; // keep fallback center
+      }
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
+
+      final position = await Geolocator.getCurrentPosition();
+      if (!mounted) return;
+      setState(() => _initialCenter = LatLng(position.latitude, position.longitude));
+      _mapController?.animateCamera(CameraUpdate.newLatLng(_initialCenter));
+    } catch (_) {
+      // Keep the fallback center; the map is still usable without live location.
+    }
   }
 
   Future<void> _load() async {
@@ -34,12 +62,27 @@ class _SalonMapScreenState extends State<SalonMapScreen> {
       'pageSize': 100,
       'categoryId': _selectedCategoryId,
     });
+    if (!mounted) return;
     setState(() {
       _categories = categories.items;
       _salons = salons.items;
       _isLoading = false;
     });
   }
+
+  Set<Marker> get _markers => _salons
+      .map((salon) => Marker(
+            markerId: MarkerId('salon-${salon.id}'),
+            position: LatLng(salon.latitude, salon.longitude),
+            infoWindow: InfoWindow(
+              title: salon.name,
+              snippet: '${salon.salonCategoryName ?? ''} • ★ ${salon.avgRating.toStringAsFixed(1)}',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => SalonDetailScreen(salonId: salon.id)),
+              ),
+            ),
+          ))
+      .toSet();
 
   @override
   Widget build(BuildContext context) {
@@ -58,42 +101,20 @@ class _SalonMapScreenState extends State<SalonMapScreen> {
               ],
             ),
           ),
+          const SizedBox(height: 8),
           Expanded(
-            child: Container(
-              margin: const EdgeInsets.all(12),
-              decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(12)),
-              child: _isLoading
-                  ? const LoadingIndicator()
-                  : Column(
-                      children: [
-                        const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: Row(
-                            children: [
-                              Icon(Icons.map_outlined),
-                              SizedBox(width: 8),
-                              Expanded(child: Text('Map pins (Google Maps integration pending)')),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: ListView.builder(
-                            itemCount: _salons.length,
-                            itemBuilder: (context, index) {
-                              final salon = _salons[index];
-                              return ListTile(
-                                leading: const Icon(Icons.location_pin, color: Colors.red),
-                                title: Text(salon.name),
-                                subtitle: Text('${salon.latitude.toStringAsFixed(4)}, ${salon.longitude.toStringAsFixed(4)}'),
-                                onTap: () => Navigator.of(context).push(
-                                  MaterialPageRoute(builder: (_) => SalonDetailScreen(salonId: salon.id)),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
+            child: Stack(
+              children: [
+                GoogleMap(
+                  initialCameraPosition: CameraPosition(target: _initialCenter, zoom: 12),
+                  onMapCreated: (controller) => _mapController = controller,
+                  markers: _markers,
+                  myLocationEnabled: true,
+                  myLocationButtonEnabled: true,
+                  zoomControlsEnabled: false,
+                ),
+                if (_isLoading) const Positioned(top: 16, left: 0, right: 0, child: Center(child: LoadingIndicator())),
+              ],
             ),
           ),
         ],

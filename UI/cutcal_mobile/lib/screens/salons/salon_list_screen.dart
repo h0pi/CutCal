@@ -7,6 +7,10 @@ import '../../utils/app_theme.dart';
 import '../../utils/utils_widgets.dart';
 import 'salon_detail_screen.dart';
 
+// TEMP DIAGNOSTIC TOGGLE: flip to true once we confirm images aren't the ANR cause.
+// See salon_list_screen.dart's _SalonCard for where this is used.
+const bool kShowSalonImages = false;
+
 class SalonListScreen extends StatefulWidget {
   const SalonListScreen({super.key});
 
@@ -212,10 +216,11 @@ class _SalonCard extends StatelessWidget {
                 SizedBox(
                   height: 150,
                   width: double.infinity,
-                  child: salon.profileImageUrl != null
+                  child: (kShowSalonImages && salon.profileImageUrl != null)
                       ? Image.network(
                           salon.profileImageUrl!,
                           fit: BoxFit.cover,
+                          cacheWidth: 400,
                           loadingBuilder: (context, child, progress) {
                             if (progress == null) return child;
                             return Container(

@@ -26,6 +26,7 @@ obj/
 **/android/key.properties
 **/android/**/*.jks
 **/android/**/*.keystore
+**/android/**/res/values/secrets.xml
 
 # Windows desktop build artifacts
 **/windows/flutter/ephemeral/
