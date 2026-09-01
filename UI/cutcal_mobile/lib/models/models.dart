@@ -133,6 +133,7 @@ class SalonModel {
   final bool isApproved;
   final bool autoConfirm;
   final double? distanceKm;
+  final double? minServicePrice;
   final List<SalonWorkingHoursModel> workingHours;
 
   SalonModel({
@@ -153,6 +154,7 @@ class SalonModel {
     this.isApproved = false,
     this.autoConfirm = false,
     this.distanceKm,
+    this.minServicePrice,
     this.workingHours = const [],
   });
 
@@ -174,6 +176,7 @@ class SalonModel {
         isApproved: json['isApproved'] ?? false,
         autoConfirm: json['autoConfirm'] ?? false,
         distanceKm: json['distanceKm'] == null ? null : (json['distanceKm']).toDouble(),
+        minServicePrice: json['minServicePrice'] == null ? null : (json['minServicePrice']).toDouble(),
         workingHours: (json['workingHours'] as List? ?? [])
             .map((e) => SalonWorkingHoursModel.fromJson(e))
             .toList(),

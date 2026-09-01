@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../models/models.dart';
 import '../../providers/entity_providers.dart';
 import '../../utils/api_client_exception.dart';
+import '../../utils/app_theme.dart';
 import '../../utils/utils_widgets.dart';
 
 class ManagerAppointmentsScreen extends StatefulWidget {
@@ -87,39 +88,7 @@ class _ManagerAppointmentsScreenState extends State<ManagerAppointmentsScreen> {
   }
 
   Future<void> _cancel(AppointmentModel a) async {
-    final reasonController = TextEditingController();
-    String? errorText;
-    final reason = await showDialog<String>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Cancel appointment'),
-          content: TextField(
-            controller: reasonController,
-            autofocus: true,
-            decoration: InputDecoration(labelText: 'Reason', border: const OutlineInputBorder(), errorText: errorText),
-            maxLines: 2,
-            onChanged: (_) {
-              if (errorText != null) setDialogState(() => errorText = null);
-            },
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Back')),
-            TextButton(
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
-              onPressed: () {
-                if (reasonController.text.trim().isEmpty) {
-                  setDialogState(() => errorText = 'A reason is required.');
-                  return;
-                }
-                Navigator.of(context).pop(reasonController.text.trim());
-              },
-              child: const Text('Cancel appointment'),
-            ),
-          ],
-        ),
-      ),
-    );
+    final reason = await showCancelReasonDialog(context);
     if (reason == null) return;
 
     try {
@@ -134,89 +103,101 @@ class _ManagerAppointmentsScreenState extends State<ManagerAppointmentsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Salon Appointments')),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(title: const Text('Bookings')),
       body: Column(
         children: [
-          SizedBox(
-            height: 48,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              children: _statuses
-                  .map((s) => Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: ChoiceChip(
-                          label: Text(s),
-                          selected: _status == s,
-                          onSelected: (_) {
-                            setState(() => _status = s);
-                            _load();
-                          },
-                        ),
-                      ))
-                  .toList(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: FilterChipRow(
+              labels: _statuses,
+              selectedIndex: _statuses.indexOf(_status),
+              onChanged: (i) {
+                setState(() => _status = _statuses[i]);
+                _load();
+              },
             ),
           ),
           Expanded(
             child: _isLoading
                 ? const LoadingIndicator()
                 : _appointments.isEmpty
-                    ? const Center(child: Text('No appointments here.'))
-                    : ListView.builder(
+                    ? const Center(child: Text('No appointments here.', style: TextStyle(color: AppColors.textSecondary)))
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                         itemCount: _appointments.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
                           final a = _appointments[index];
-                          return Card(
-                            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
+                          return Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: const Color(0xFFEDEAF4)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        '${a.customerName ?? 'Customer'} • ${a.serviceName ?? ''}',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    StatusBadge(status: a.stateName),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${a.staffName ?? ''} • ${DateFormat('MMM d, y • HH:mm').format(a.scheduledAt)}',
+                                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                                ),
+                                if (a.cancellationReason != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Text('Reason: ${a.cancellationReason}', style: const TextStyle(color: AppColors.declinedText, fontSize: 12)),
+                                  ),
+                                if (a.stateName == 'Pending' || a.stateName == 'Confirmed') ...[
+                                  const SizedBox(height: 10),
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
+                                      if (a.stateName == 'Pending')
+                                        Expanded(
+                                          child: FilledButton(
+                                            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(38)),
+                                            onPressed: () => _confirm(a),
+                                            child: const Text('Confirm', style: TextStyle(fontSize: 13)),
+                                          ),
+                                        ),
+                                      if (a.stateName == 'Confirmed')
+                                        Expanded(
+                                          child: FilledButton(
+                                            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(38)),
+                                            onPressed: () => _complete(a),
+                                            child: const Text('Complete', style: TextStyle(fontSize: 13)),
+                                          ),
+                                        ),
+                                      const SizedBox(width: 8),
                                       Expanded(
-                                        child: Text(
-                                          '${a.customerName ?? 'Customer'} • ${a.serviceName ?? ''}',
-                                          style: const TextStyle(fontWeight: FontWeight.w600),
-                                          overflow: TextOverflow.ellipsis,
+                                        child: OutlinedButton(
+                                          style: OutlinedButton.styleFrom(
+                                            minimumSize: const Size.fromHeight(38),
+                                            foregroundColor: AppColors.declinedText,
+                                            side: const BorderSide(color: Color(0xFFFCA5A5)),
+                                          ),
+                                          onPressed: () => _cancel(a),
+                                          child: const Text('Cancel', style: TextStyle(fontSize: 13)),
                                         ),
                                       ),
-                                      StatusBadge(status: a.stateName),
                                     ],
                                   ),
-                                  Text('${a.staffName ?? ''} • ${DateFormat('MMM d, y • HH:mm').format(a.scheduledAt)}'),
-                                  if (a.cancellationReason != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 4),
-                                      child: Text('Reason: ${a.cancellationReason}', style: const TextStyle(color: Colors.red, fontSize: 12)),
-                                    ),
-                                  if (a.stateName == 'Pending' || a.stateName == 'Confirmed') ...[
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      children: [
-                                        if (a.stateName == 'Pending')
-                                          Expanded(
-                                            child: FilledButton(onPressed: () => _confirm(a), child: const Text('Confirm')),
-                                          ),
-                                        if (a.stateName == 'Confirmed')
-                                          Expanded(
-                                            child: FilledButton(onPressed: () => _complete(a), child: const Text('Complete')),
-                                          ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: OutlinedButton(
-                                            style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                                            onPressed: () => _cancel(a),
-                                            child: const Text('Cancel'),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
                                 ],
-                              ),
+                              ],
                             ),
                           );
                         },

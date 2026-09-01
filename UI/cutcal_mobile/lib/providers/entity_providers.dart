@@ -80,6 +80,13 @@ class AppointmentProvider extends BaseProvider<AppointmentModel> {
     final data = validateResponse(response);
     return fromJson(data);
   }
+
+  Future<AppointmentModel> reschedule(int id, DateTime scheduledAt) async {
+    final uri = Uri.parse('${AuthProvider.baseUrl}Appointments/$id/Reschedule');
+    final response = await http.put(uri, headers: createHeaders(), body: jsonEncode({'scheduledAt': scheduledAt.toIso8601String()}));
+    final data = validateResponse(response);
+    return fromJson(data);
+  }
 }
 
 class ReviewProvider extends BaseProvider<ReviewModel> {
@@ -88,6 +95,13 @@ class ReviewProvider extends BaseProvider<ReviewModel> {
 
   @override
   ReviewModel fromJson(json) => ReviewModel.fromJson(json);
+
+  Future<ReviewModel> reply(int id, String reply) async {
+    final uri = Uri.parse('${AuthProvider.baseUrl}Reviews/$id/Reply');
+    final response = await http.put(uri, headers: createHeaders(), body: jsonEncode({'reply': reply}));
+    final data = validateResponse(response);
+    return fromJson(data);
+  }
 }
 
 class NotificationProvider extends BaseProvider<NotificationModel> {
@@ -145,6 +159,23 @@ class PaymentProvider extends BaseProvider<Map<String, dynamic>> {
       headers: createHeaders(),
       body: jsonEncode({'paypalOrderId': paypalOrderId, 'appointmentId': appointmentId}),
     );
+    return Map<String, dynamic>.from(validateResponse(response));
+  }
+}
+
+class ReportProvider extends BaseProvider<Map<String, dynamic>> {
+  @override
+  String getEndpoint() => 'Reports';
+
+  @override
+  Map<String, dynamic> fromJson(json) => Map<String, dynamic>.from(json);
+
+  Future<Map<String, dynamic>> getSummary({DateTime? dateFrom, DateTime? dateTo}) async {
+    final uri = Uri.parse('${AuthProvider.baseUrl}Reports${getQueryString({
+          'dateFrom': dateFrom?.toIso8601String(),
+          'dateTo': dateTo?.toIso8601String(),
+        })}');
+    final response = await http.get(uri, headers: createHeaders());
     return Map<String, dynamic>.from(validateResponse(response));
   }
 }

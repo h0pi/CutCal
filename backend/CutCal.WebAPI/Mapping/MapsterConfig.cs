@@ -17,7 +17,8 @@ public static class MapsterConfig
 
         TypeAdapterConfig<Salon, SalonResponse>.NewConfig()
             .Map(dest => dest.SalonCategoryName, src => src.SalonCategory != null ? src.SalonCategory.Name : null)
-            .Map(dest => dest.CityName, src => src.City != null ? src.City.Name : null);
+            .Map(dest => dest.CityName, src => src.City != null ? src.City.Name : null)
+            .Map(dest => dest.MinServicePrice, src => src.Services.Where(s => s.IsActive).Select(s => (decimal?)s.Price).Min());
 
         TypeAdapterConfig<Appointment, AppointmentResponse>.NewConfig()
             .Map(dest => dest.CustomerName, src => src.Customer != null ? src.Customer.FirstName + " " + src.Customer.LastName : null)

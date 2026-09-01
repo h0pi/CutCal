@@ -53,7 +53,8 @@ public class SalonManagementService : BaseCRUDService<Salon, SalonResponse, Salo
         return query
             .Include(x => x.SalonCategory)
             .Include(x => x.City)
-            .Include(x => x.WorkingHours);
+            .Include(x => x.WorkingHours)
+            .Include(x => x.Services);
     }
 
     protected override IQueryable<Salon> AddSecurityFilter(IQueryable<Salon> query)

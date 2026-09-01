@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../utils/api_client_exception.dart';
+import '../../utils/app_theme.dart';
 import '../../utils/utils_widgets.dart';
 import 'register_screen.dart';
 
@@ -50,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.cut, size: 64, color: Colors.deepPurple),
+                  const Icon(Icons.cut, size: 64, color: AppColors.primary),
                   const SizedBox(height: 8),
                   Text('CutCal', style: Theme.of(context).textTheme.headlineMedium),
                   const SizedBox(height: 32),

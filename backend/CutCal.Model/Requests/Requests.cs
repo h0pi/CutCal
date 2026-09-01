@@ -165,6 +165,11 @@ public class AppointmentInsertRequest
     public string PaymentMethod { get; set; } = null!;
 }
 
+public class AppointmentRescheduleRequest
+{
+    public DateTime ScheduledAt { get; set; }
+}
+
 public class AppointmentCancelRequest
 {
     public string Reason { get; set; } = null!;

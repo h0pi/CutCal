@@ -62,4 +62,11 @@ public class AppointmentsController : ControllerBase
     {
         return Ok(await _service.CompleteAsync(id));
     }
+
+    [HttpPut("{id:int}/Reschedule")]
+    [Authorize(Roles = "Customer")]
+    public async Task<ActionResult<AppointmentResponse>> Reschedule(int id, [FromBody] AppointmentRescheduleRequest request)
+    {
+        return Ok(await _service.RescheduleAsync(id, request.ScheduledAt, _userAccessor.UserId));
+    }
 }

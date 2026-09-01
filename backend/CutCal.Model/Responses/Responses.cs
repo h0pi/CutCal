@@ -63,6 +63,7 @@ public class SalonResponse
     public DateTime CreatedAt { get; set; }
     public List<SalonWorkingHoursResponse> WorkingHours { get; set; } = new();
     public double? DistanceKm { get; set; }
+    public decimal? MinServicePrice { get; set; }
 }
 
 public class SalonCategoryResponse

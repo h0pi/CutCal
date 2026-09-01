@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../screens/appointments/my_appointments_screen.dart';
-import '../screens/notifications/notifications_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/salons/salon_list_screen.dart';
 import '../screens/salons/salon_map_screen.dart';
 
+// 4 tabs per the design reference (Discover / Map / Bookings / Profile) —
+// notifications are reached from Profile's "Notifications" row instead of a
+// dedicated tab.
 class MasterScreen extends StatefulWidget {
   const MasterScreen({super.key});
 
@@ -20,7 +22,6 @@ class _MasterScreenState extends State<MasterScreen> {
     SalonListScreen(),
     SalonMapScreen(),
     MyAppointmentsScreen(),
-    NotificationsScreen(),
     ProfileScreen(),
   ];
 
@@ -32,11 +33,10 @@ class _MasterScreenState extends State<MasterScreen> {
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.storefront), label: 'Salons'),
-          NavigationDestination(icon: Icon(Icons.map), label: 'Map'),
-          NavigationDestination(icon: Icon(Icons.event_note), label: 'Appointments'),
-          NavigationDestination(icon: Icon(Icons.notifications), label: 'Alerts'),
-          NavigationDestination(icon: Icon(Icons.person), label: 'Profile'),
+          NavigationDestination(icon: Icon(Icons.explore_outlined), selectedIcon: Icon(Icons.explore), label: 'Discover'),
+          NavigationDestination(icon: Icon(Icons.map_outlined), selectedIcon: Icon(Icons.map), label: 'Map'),
+          NavigationDestination(icon: Icon(Icons.calendar_today_outlined), selectedIcon: Icon(Icons.calendar_today), label: 'Bookings'),
+          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
     );

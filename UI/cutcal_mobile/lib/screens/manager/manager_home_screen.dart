@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../notifications/notifications_screen.dart';
 import 'manager_appointments_screen.dart';
 import 'manager_dashboard_screen.dart';
-import 'manager_profile_screen.dart';
+import 'manager_salon_screen.dart';
+import 'manager_services_screen.dart';
+import 'manager_staff_screen.dart';
 
 class ManagerHomeScreen extends StatefulWidget {
   const ManagerHomeScreen({super.key});
@@ -18,8 +19,9 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
   static const _screens = [
     ManagerDashboardScreen(),
     ManagerAppointmentsScreen(),
-    NotificationsScreen(),
-    ManagerProfileScreen(),
+    ManagerServicesScreen(),
+    ManagerStaffScreen(),
+    ManagerSalonScreen(),
   ];
 
   @override
@@ -30,10 +32,11 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.storefront), label: 'My Salon'),
-          NavigationDestination(icon: Icon(Icons.event_note), label: 'Appointments'),
-          NavigationDestination(icon: Icon(Icons.notifications), label: 'Alerts'),
-          NavigationDestination(icon: Icon(Icons.person), label: 'Profile'),
+          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
+          NavigationDestination(icon: Icon(Icons.event_note_outlined), selectedIcon: Icon(Icons.event_note), label: 'Bookings'),
+          NavigationDestination(icon: Icon(Icons.menu_book_outlined), selectedIcon: Icon(Icons.menu_book), label: 'Menu'),
+          NavigationDestination(icon: Icon(Icons.groups_outlined), selectedIcon: Icon(Icons.groups), label: 'Team'),
+          NavigationDestination(icon: Icon(Icons.storefront_outlined), selectedIcon: Icon(Icons.storefront), label: 'Salon'),
         ],
       ),
     );

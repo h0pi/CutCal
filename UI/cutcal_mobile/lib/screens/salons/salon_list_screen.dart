@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/entity_providers.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/utils_widgets.dart';
 import 'salon_detail_screen.dart';
 
-// TEMP DIAGNOSTIC TOGGLE: flip to true once we confirm images aren't the ANR cause.
-// See salon_list_screen.dart's _SalonCard for where this is used.
-const bool kShowSalonImages = false;
+// Images are network-loaded; bounded via cacheWidth to keep decode cost low.
+const bool kShowSalonImages = true;
 
 class SalonListScreen extends StatefulWidget {
   const SalonListScreen({super.key});
@@ -23,44 +24,44 @@ class _SalonListScreenState extends State<SalonListScreen> {
   List<SalonCategoryModel> _categories = [];
   int? _selectedCategoryId;
   List<SalonModel> _salons = [];
-  Set<int> _favoriteSalonIds = {};
   int _page = 0;
   bool _isLoading = false;
   bool _hasMore = true;
+  double? _lat;
+  double? _lng;
 
   @override
   void initState() {
     super.initState();
     _loadCategories();
-    _loadFavorites();
+    _determineLocation();
     _loadSalons(reset: true);
+  }
+
+  Future<void> _determineLocation() async {
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) return;
+      if (!await Geolocator.isLocationServiceEnabled()) return;
+
+      final position = await Geolocator.getCurrentPosition();
+      if (!mounted) return;
+      setState(() {
+        _lat = position.latitude;
+        _lng = position.longitude;
+      });
+      _loadSalons(reset: true);
+    } catch (_) {
+      // Distance just won't be shown; the rest of the screen still works.
+    }
   }
 
   Future<void> _loadCategories() async {
     final result = await context.read<SalonCategoryProvider>().get();
     if (mounted) setState(() => _categories = result.items);
-  }
-
-  Future<void> _loadFavorites() async {
-    final favorites = await context.read<FavoriteProvider>().getMine();
-    if (mounted) setState(() => _favoriteSalonIds = favorites.map((f) => f.salonId).toSet());
-  }
-
-  Future<void> _toggleFavorite(SalonModel salon) async {
-    final isFavorite = _favoriteSalonIds.contains(salon.id);
-    setState(() {
-      if (isFavorite) {
-        _favoriteSalonIds.remove(salon.id);
-      } else {
-        _favoriteSalonIds.add(salon.id);
-      }
-    });
-    final provider = context.read<FavoriteProvider>();
-    if (isFavorite) {
-      await provider.removeSalon(salon.id);
-    } else {
-      await provider.add(salon.id);
-    }
   }
 
   Future<void> _loadSalons({bool reset = false}) async {
@@ -79,7 +80,10 @@ class _SalonListScreenState extends State<SalonListScreen> {
         'pageSize': 10,
         'name': _searchController.text.isEmpty ? null : _searchController.text,
         'categoryId': _selectedCategoryId,
+        'lat': _lat,
+        'lng': _lng,
       });
+      if (!mounted) return;
       setState(() {
         _salons.addAll(result.items);
         _hasMore = _salons.length < result.totalCount;
@@ -90,60 +94,139 @@ class _SalonListScreenState extends State<SalonListScreen> {
     }
   }
 
+  String get _greeting {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'GOOD MORNING';
+    if (hour < 18) return 'GOOD AFTERNOON';
+    return 'GOOD EVENING';
+  }
+
+  String get _initials {
+    final first = AuthProvider.accessTokenDecoded?['FirstName']?.toString() ?? '';
+    final last = AuthProvider.accessTokenDecoded?['LastName']?.toString() ?? '';
+    final initials = '${first.isNotEmpty ? first[0] : ''}${last.isNotEmpty ? last[0] : ''}';
+    return initials.isEmpty ? '?' : initials.toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Salons', style: TextStyle(fontWeight: FontWeight.bold)),
-        actions: [
-          IconButton(icon: const Icon(Icons.tune), onPressed: () {}),
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(child: _buildHeader()),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            sliver: SliverToBoxAdapter(
+              child: SizedBox(
+                height: 40,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    _categoryChip(null, 'All'),
+                    ..._categories.map((c) => _categoryChip(c.id, c.name)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            sliver: SliverToBoxAdapter(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _selectedCategoryId == null ? 'Top rated nearby' : 'Results',
+                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                  ),
+                  Text('${_salons.length} nearby', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 13)),
+                ],
+              ),
+            ),
+          ),
+          if (_salons.isEmpty && !_isLoading)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: Text('No salons found.', style: TextStyle(color: AppColors.textSecondary))),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+              sliver: SliverList.builder(
+                itemCount: _salons.length + (_hasMore ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (index == _salons.length) {
+                    _loadSalons();
+                    return const Padding(padding: EdgeInsets.all(16), child: LoadingIndicator());
+                  }
+                  final salon = _salons[index];
+                  return _SalonCard(salon: salon);
+                },
+              ),
+            ),
         ],
       ),
-      body: Column(
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 56, 20, 24),
+      decoration: const BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.only(bottomLeft: Radius.circular(28), bottomRight: Radius.circular(28)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: TextField(
-              controller: _searchController,
-              decoration: const InputDecoration(
-                hintText: 'Search salons...',
-                prefixIcon: Icon(Icons.search),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_greeting, style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+                    const SizedBox(height: 4),
+                    const Text('Find your next look', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                  ],
+                ),
               ),
-              onSubmitted: (_) => _loadSalons(reset: true),
-            ),
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: Colors.white.withValues(alpha: 0.2),
+                child: Text(_initials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 40,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              children: [
-                _categoryChip(null, 'All'),
-                ..._categories.map((c) => _categoryChip(c.id, c.name)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: _salons.isEmpty && !_isLoading
-                ? const Center(child: Text('No salons found.', style: TextStyle(color: Colors.white70)))
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-                    itemCount: _salons.length + (_hasMore ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index == _salons.length) {
-                        _loadSalons();
-                        return const Padding(padding: EdgeInsets.all(16), child: LoadingIndicator());
-                      }
-                      final salon = _salons[index];
-                      return _SalonCard(
-                        salon: salon,
-                        isFavorite: _favoriteSalonIds.contains(salon.id),
-                        onToggleFavorite: () => _toggleFavorite(salon),
-                      );
-                    },
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: const InputDecoration(
+                      hintText: 'Salon, address, or service',
+                      prefixIcon: Icon(Icons.search),
+                      isCollapsed: false,
+                    ),
+                    onSubmitted: (_) => _loadSalons(reset: true),
                   ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Material(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(24),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(24),
+                  onTap: () {},
+                  child: const SizedBox(width: 48, height: 48, child: Icon(Icons.tune, color: Colors.white)),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -168,14 +251,12 @@ class _SalonListScreenState extends State<SalonListScreen> {
 
 class _SalonCard extends StatelessWidget {
   final SalonModel salon;
-  final bool isFavorite;
-  final VoidCallback onToggleFavorite;
 
-  const _SalonCard({required this.salon, required this.isFavorite, required this.onToggleFavorite});
+  const _SalonCard({required this.salon});
 
   bool? get _isOpenNow {
     if (salon.workingHours.isEmpty) return null;
-    final backendDay = DateTime.now().weekday - 1; // Dart Mon=1..Sun=7 -> backend Mon=0..Sun=6
+    final backendDay = DateTime.now().weekday - 1;
     final today = salon.workingHours.where((wh) => wh.dayOfWeek == backendDay).firstOrNull;
     if (today == null || today.isClosed || today.openTime == null || today.closeTime == null) return false;
 
@@ -186,6 +267,18 @@ class _SalonCard extends StatelessWidget {
 
     final nowMinutes = now.hour * 60 + now.minute;
     return nowMinutes >= (open.hour * 60 + open.minute) && nowMinutes <= (close.hour * 60 + close.minute);
+  }
+
+  String? get _closeTimeLabel {
+    final backendDay = DateTime.now().weekday - 1;
+    final today = salon.workingHours.where((wh) => wh.dayOfWeek == backendDay).firstOrNull;
+    if (today == null || today.closeTime == null) return null;
+    final parts = today.closeTime!.split(':');
+    if (parts.length < 2) return null;
+    final hour = int.tryParse(parts[0]) ?? 0;
+    final suffix = hour >= 12 ? 'pm' : 'am';
+    final hour12 = hour % 12 == 0 ? 12 : hour % 12;
+    return '$hour12$suffix';
   }
 
   TimeOfDay? _parseTime(String value) {
@@ -200,13 +293,23 @@ class _SalonCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isOpen = _isOpenNow;
+    final closeLabel = _closeTimeLabel;
+
+    final subtitleParts = <String>[];
+    if (salon.distanceKm != null) subtitleParts.add('${salon.distanceKm!.toStringAsFixed(1)} mi');
+    if (salon.cityName != null) subtitleParts.add(salon.cityName!);
+    if (isOpen == true && closeLabel != null) {
+      subtitleParts.add('Open till $closeLabel');
+    } else if (isOpen == false) {
+      subtitleParts.add('Closed');
+    }
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => SalonDetailScreen(salonId: salon.id)),
+          MaterialPageRoute(builder: (_) => SalonDetailScreen(salonId: salon.id, initialDistanceKm: salon.distanceKm)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -214,7 +317,7 @@ class _SalonCard extends StatelessWidget {
             Stack(
               children: [
                 SizedBox(
-                  height: 150,
+                  height: 140,
                   width: double.infinity,
                   child: (kShowSalonImages && salon.profileImageUrl != null)
                       ? Image.network(
@@ -224,45 +327,20 @@ class _SalonCard extends StatelessWidget {
                           loadingBuilder: (context, child, progress) {
                             if (progress == null) return child;
                             return Container(
-                              color: AppColors.primary,
+                              color: AppColors.primaryLight,
                               alignment: Alignment.center,
-                              child: const CircularProgressIndicator(color: AppColors.accent, strokeWidth: 2),
+                              child: const CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2),
                             );
                           },
                           errorBuilder: (context, error, stackTrace) => Container(
-                            color: AppColors.primary,
+                            color: AppColors.primaryLight,
                             alignment: Alignment.center,
-                            child: const Icon(Icons.storefront, size: 40, color: AppColors.accent),
+                            child: const Icon(Icons.storefront, size: 40, color: AppColors.primary),
                           ),
                         )
-                      : Container(color: AppColors.primary, child: const Icon(Icons.storefront, size: 40, color: AppColors.accent)),
+                      : Container(color: AppColors.primaryLight, child: const Icon(Icons.storefront, size: 40, color: AppColors.primary)),
                 ),
-                if (salon.avgRating >= 4.5)
-                  Positioned(
-                    top: 10,
-                    left: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(20)),
-                      child: const Text('Top rated', style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: GestureDetector(
-                    onTap: onToggleFavorite,
-                    child: CircleAvatar(
-                      radius: 16,
-                      backgroundColor: AppColors.primary.withValues(alpha: 0.75),
-                      child: Icon(
-                        isFavorite ? Icons.favorite : Icons.favorite_border,
-                        color: isFavorite ? AppColors.accent : Colors.white,
-                        size: 18,
-                      ),
-                    ),
-                  ),
-                ),
+                Positioned(top: 10, right: 10, child: RatingBadge(rating: salon.avgRating)),
               ],
             ),
             Padding(
@@ -276,61 +354,39 @@ class _SalonCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           salon.name,
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.star_rounded, color: AppColors.accent, size: 18),
-                          const SizedBox(width: 2),
-                          Text(salon.avgRating.toStringAsFixed(1), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                        ],
-                      ),
+                      if (salon.minServicePrice != null)
+                        Text(
+                          'from \$${salon.minServicePrice!.toStringAsFixed(0)}',
+                          style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
                     ],
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    salon.salonCategoryName ?? '',
-                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                    subtitleParts.join(' · '),
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      if (salon.distanceKm != null) ...[
-                        _infoPill(Icons.place_outlined, '${salon.distanceKm!.toStringAsFixed(1)} km', AppColors.accent),
-                        const SizedBox(width: 8),
-                      ],
-                      if (isOpen != null)
-                        _infoPill(
-                          isOpen ? Icons.check_circle_outline : Icons.schedule,
-                          isOpen ? 'Open now' : 'Closed',
-                          isOpen ? Colors.greenAccent.shade200 : Colors.white60,
-                        ),
-                    ],
-                  ),
+                  if ((salon.salonCategoryName ?? '').isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(color: AppColors.primaryLight, borderRadius: BorderRadius.circular(20)),
+                      child: Text(
+                        salon.salonCategoryName!,
+                        style: const TextStyle(color: AppColors.primaryDark, fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _infoPill(IconData icon, String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(20)),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 4),
-          Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
-        ],
       ),
     );
   }

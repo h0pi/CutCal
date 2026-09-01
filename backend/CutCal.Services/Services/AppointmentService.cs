@@ -18,6 +18,7 @@ public interface IAppointmentService : IBaseReadService<AppointmentResponse, App
     Task<AppointmentResponse> ConfirmAsync(int id, int managerId);
     Task<AppointmentResponse> CancelAsync(int id, string reason, int userId);
     Task<AppointmentResponse> CompleteAsync(int id);
+    Task<AppointmentResponse> RescheduleAsync(int id, DateTime newScheduledAt, int customerId);
 }
 
 public class AppointmentService : BaseReadService<Appointment, AppointmentResponse, AppointmentSearchObject>, IAppointmentService
@@ -110,6 +111,39 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
         _ => throw new ClientException($"Unknown appointment state '{stateName}'.")
     };
 
+    /// <summary>
+    /// Shared by InsertAsync and RescheduleAsync: the salon must be open at that time, and the
+    /// staff member must not already have another (non-cancelled) appointment overlapping it.
+    /// </summary>
+    private async Task ValidateSlotAvailableAsync(Salon salon, int durationMinutes, int staffId, DateTime scheduledAt, int? excludeAppointmentId)
+    {
+        var dayOfWeek = (int)scheduledAt.DayOfWeek;
+        var workingHours = salon.WorkingHours.FirstOrDefault(x => x.DayOfWeek == dayOfWeek);
+        if (workingHours is null || workingHours.IsClosed || workingHours.OpenTime is null || workingHours.CloseTime is null)
+        {
+            throw new ClientException("Salon is closed on the selected day.");
+        }
+
+        var requestedTime = TimeOnly.FromDateTime(scheduledAt);
+        var endTime = TimeOnly.FromDateTime(scheduledAt.AddMinutes(durationMinutes));
+        if (requestedTime < workingHours.OpenTime.Value || endTime > workingHours.CloseTime.Value)
+        {
+            throw new ClientException("Selected time is outside of salon working hours.");
+        }
+
+        var endsAt = scheduledAt.AddMinutes(durationMinutes);
+        var overlapping = await Context.Appointments.AnyAsync(a =>
+            a.StaffId == staffId &&
+            a.Id != (excludeAppointmentId ?? 0) &&
+            a.StateName != "Cancelled" &&
+            a.ScheduledAt < endsAt &&
+            scheduledAt < a.ScheduledAt.AddMinutes(a.DurationMinutes));
+        if (overlapping)
+        {
+            throw new ClientException("Selected staff member already has an appointment at that time.");
+        }
+    }
+
     public async Task<AppointmentResponse> InsertAsync(AppointmentInsertRequest request, int customerId)
     {
         var salon = await Context.Salons.Include(x => x.WorkingHours).FirstOrDefaultAsync(x => x.Id == request.SalonId)
@@ -119,30 +153,7 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
         var staff = await Context.Staff.FirstOrDefaultAsync(x => x.Id == request.StaffId && x.SalonId == request.SalonId)
             ?? throw new ClientException("Staff member not found for this salon.");
 
-        var dayOfWeek = (int)request.ScheduledAt.DayOfWeek;
-        var workingHours = salon.WorkingHours.FirstOrDefault(x => x.DayOfWeek == dayOfWeek);
-        if (workingHours is null || workingHours.IsClosed || workingHours.OpenTime is null || workingHours.CloseTime is null)
-        {
-            throw new ClientException("Salon is closed on the selected day.");
-        }
-
-        var requestedTime = TimeOnly.FromDateTime(request.ScheduledAt);
-        var endTime = TimeOnly.FromDateTime(request.ScheduledAt.AddMinutes(service.DurationMinutes));
-        if (requestedTime < workingHours.OpenTime.Value || endTime > workingHours.CloseTime.Value)
-        {
-            throw new ClientException("Selected time is outside of salon working hours.");
-        }
-
-        var endsAt = request.ScheduledAt.AddMinutes(service.DurationMinutes);
-        var overlapping = await Context.Appointments.AnyAsync(a =>
-            a.StaffId == request.StaffId &&
-            a.StateName != "Cancelled" &&
-            a.ScheduledAt < endsAt &&
-            request.ScheduledAt < a.ScheduledAt.AddMinutes(a.DurationMinutes));
-        if (overlapping)
-        {
-            throw new ClientException("Selected staff member already has an appointment at that time.");
-        }
+        await ValidateSlotAvailableAsync(salon, service.DurationMinutes, request.StaffId, request.ScheduledAt, excludeAppointmentId: null);
 
         var appointment = new Appointment
         {
@@ -230,6 +241,32 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
         await _notificationService.CreateAsync(appointment.CustomerId, "Appointment completed",
             $"Your appointment at {appointment.Salon.Name} on {appointment.ScheduledAt:g} is now complete. Feel free to leave a review!",
             nameof(CutCal.Model.Enums.NotificationType.AppointmentCompleted));
+
+        return await GetByIdAsync(id) ?? appointment.Adapt<AppointmentResponse>();
+    }
+
+    public async Task<AppointmentResponse> RescheduleAsync(int id, DateTime newScheduledAt, int customerId)
+    {
+        var appointment = await Context.Appointments.Include(x => x.Salon).ThenInclude(s => s.WorkingHours).FirstOrDefaultAsync(x => x.Id == id)
+            ?? throw new ClientException("Appointment not found.");
+
+        if (appointment.CustomerId != customerId)
+        {
+            throw new ClientException("You can only reschedule your own appointments.");
+        }
+        if (appointment.StateName is not ("Pending" or "Confirmed"))
+        {
+            throw new ClientException($"An appointment in state '{appointment.StateName}' cannot be rescheduled.");
+        }
+
+        await ValidateSlotAvailableAsync(appointment.Salon, appointment.DurationMinutes, appointment.StaffId, newScheduledAt, excludeAppointmentId: id);
+
+        appointment.ScheduledAt = newScheduledAt;
+        await Context.SaveChangesAsync();
+
+        await _notificationService.CreateAsync(appointment.CustomerId, "Appointment rescheduled",
+            $"Your appointment at {appointment.Salon.Name} was moved to {newScheduledAt:g}.",
+            nameof(CutCal.Model.Enums.NotificationType.AppointmentConfirmed));
 
         return await GetByIdAsync(id) ?? appointment.Adapt<AppointmentResponse>();
     }

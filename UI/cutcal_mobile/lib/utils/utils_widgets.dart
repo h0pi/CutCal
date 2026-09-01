@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'app_theme.dart';
+
 Future<bool> showConfirmationDialog(
   BuildContext context, {
   required String title,
@@ -30,6 +32,49 @@ Future<bool> showConfirmationDialog(
   return result ?? false;
 }
 
+/// Shared "why are you cancelling" dialog: blocks closing until a non-empty
+/// reason is entered, showing an inline validation error instead of doing nothing.
+Future<String?> showCancelReasonDialog(BuildContext context) async {
+  final reasonController = TextEditingController();
+  String? errorText;
+
+  return showDialog<String>(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setDialogState) => AlertDialog(
+        title: const Text('Cancel appointment'),
+        content: TextField(
+          controller: reasonController,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: 'Reason for cancellation',
+            border: const OutlineInputBorder(),
+            errorText: errorText,
+          ),
+          maxLines: 2,
+          onChanged: (_) {
+            if (errorText != null) setDialogState(() => errorText = null);
+          },
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Back')),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () {
+              if (reasonController.text.trim().isEmpty) {
+                setDialogState(() => errorText = 'Please tell us why you are cancelling.');
+                return;
+              }
+              Navigator.of(context).pop(reasonController.text.trim());
+            },
+            child: const Text('Cancel appointment'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 void showSuccessSnackBar(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(content: Text(message), backgroundColor: Colors.green),
@@ -49,37 +94,156 @@ class LoadingIndicator extends StatelessWidget {
   Widget build(BuildContext context) => const Center(child: CircularProgressIndicator());
 }
 
+/// Small uppercase status pill (PENDING / CONFIRMED / COMPLETED / DECLINED / PAID / UPCOMING),
+/// styled per the design reference: solid pale background, no border, bold uppercase text.
 class StatusBadge extends StatelessWidget {
   final String status;
 
   const StatusBadge({super.key, required this.status});
 
-  Color _colorFor(String status) {
+  (Color, Color) _colorsFor(String status) {
     switch (status) {
       case 'Pending':
-        return Colors.orange;
+        return (AppColors.pendingText, AppColors.pendingBg);
       case 'Confirmed':
-        return Colors.blue;
+      case 'Upcoming':
+        return (AppColors.confirmedText, AppColors.confirmedBg);
       case 'Completed':
-        return Colors.green;
+      case 'Paid':
+        return (AppColors.completedText, AppColors.completedBg);
       case 'Cancelled':
-        return Colors.red;
+      case 'Declined':
+        return (AppColors.declinedText, AppColors.declinedBg);
       default:
-        return Colors.grey;
+        return (AppColors.neutralText, AppColors.neutralBg);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final color = _colorFor(status);
+    final (text, bg) = _colorsFor(status);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
+      child: Text(
+        status.toUpperCase(),
+        style: TextStyle(color: text, fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 0.3),
       ),
-      child: Text(status, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 12)),
+    );
+  }
+}
+
+/// Equal-width pill segmented control (e.g. "Upcoming | Completed"), matching the
+/// design reference: grey track, animated white pill behind the selected label.
+class SegmentedTabs extends StatelessWidget {
+  final List<String> labels;
+  final int selectedIndex;
+  final ValueChanged<int> onChanged;
+
+  const SegmentedTabs({super.key, required this.labels, required this.selectedIndex, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: BorderRadius.circular(16)),
+      child: Row(
+        children: List.generate(labels.length, (i) {
+          final selected = i == selectedIndex;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => onChanged(i),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: selected ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: selected ? const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1))] : null,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  labels[i],
+                  style: TextStyle(
+                    fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+                    color: selected ? AppColors.textPrimary : AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+/// Scrollable filter chip row (e.g. "All / Pending / Confirmed / Completed / Declined"),
+/// selected = solid near-black pill, unselected = white pill with a light grey border.
+class FilterChipRow extends StatelessWidget {
+  final List<String> labels;
+  final int selectedIndex;
+  final ValueChanged<int> onChanged;
+
+  const FilterChipRow({super.key, required this.labels, required this.selectedIndex, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        itemCount: labels.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final selected = i == selectedIndex;
+          return GestureDetector(
+            onTap: () => onChanged(i),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: selected ? AppColors.textPrimary : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: selected ? null : Border.all(color: const Color(0xFFE5E1EF)),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                labels[i],
+                style: TextStyle(
+                  color: selected ? Colors.white : AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Dark "★ 4.8" pill used as an overlay on salon cover photos.
+class RatingBadge extends StatelessWidget {
+  final double rating;
+
+  const RatingBadge({super.key, required this.rating});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(color: AppColors.ratingBadge.withValues(alpha: 0.85), borderRadius: BorderRadius.circular(20)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.star, size: 13, color: AppColors.starColor),
+          const SizedBox(width: 4),
+          Text(rating.toStringAsFixed(1), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+        ],
+      ),
     );
   }
 }

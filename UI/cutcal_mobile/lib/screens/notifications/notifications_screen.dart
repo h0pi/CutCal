@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../providers/entity_providers.dart';
+import '../../utils/app_theme.dart';
 import '../../utils/utils_widgets.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -58,7 +59,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 await context.read<NotificationProvider>().markAllRead();
                 _load();
               },
-              child: const Text('Mark all read', style: TextStyle(color: Colors.white)),
+              child: const Text('Mark all read'),
             ),
         ],
       ),
@@ -71,8 +72,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   itemBuilder: (context, index) {
                     final n = _notifications[index];
                     return ListTile(
-                      tileColor: n.isRead ? null : Colors.deepPurple.withValues(alpha: 0.06),
-                      leading: Icon(n.isRead ? Icons.notifications_none : Icons.notifications_active, color: n.isRead ? Colors.grey : Colors.deepPurple),
+                      tileColor: n.isRead ? null : AppColors.primary.withValues(alpha: 0.06),
+                      leading: Icon(n.isRead ? Icons.notifications_none : Icons.notifications_active, color: n.isRead ? Colors.grey : AppColors.primary),
                       title: Text(n.title, style: TextStyle(fontWeight: n.isRead ? FontWeight.normal : FontWeight.bold)),
                       subtitle: Text('${n.body}\n${DateFormat('MMM d, HH:mm').format(n.sentAt)}'),
                       isThreeLine: true,
