@@ -34,6 +34,14 @@ public class SalonsController : BaseCRUDController<SalonResponse, SalonSearchObj
         return Ok(await Service.ApproveAsync(id));
     }
 
+    [HttpPost("{id:int}/View")]
+    [Authorize(Roles = "Customer")]
+    public async Task<IActionResult> LogView(int id)
+    {
+        await Service.LogViewAsync(_userAccessor.UserId, id);
+        return NoContent();
+    }
+
     [HttpGet("{id:int}/Gallery")]
     public async Task<ActionResult<List<SalonGalleryResponse>>> GetGallery(int id)
     {

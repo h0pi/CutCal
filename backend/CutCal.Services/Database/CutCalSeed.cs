@@ -40,16 +40,16 @@ public static class CutCalSeed
 
         var users = new List<User>
         {
-            new() { Id = 1, Username = "admin", FirstName = "Ana", LastName = "Adminovic", Email = "admin@cutcal.com", Phone = "+38761000001", PasswordHash = passwordHash, IsActive = true, CreatedAt = seedDate, ProfileImageUrl = "https://i.pravatar.cc/150?img=1" },
-            new() { Id = 2, Username = "admin2", FirstName = "Amar", LastName = "Adminovic", Email = "admin2@cutcal.com", Phone = "+38761000002", PasswordHash = passwordHash, IsActive = true, CreatedAt = seedDate, ProfileImageUrl = "https://i.pravatar.cc/150?img=2" },
-            new() { Id = 3, Username = "manager", FirstName = "Maja", LastName = "Menadzer", Email = "manager@cutcal.com", Phone = "+38761000003", PasswordHash = passwordHash, IsActive = true, CreatedAt = seedDate, ProfileImageUrl = "https://i.pravatar.cc/150?img=3" },
-            new() { Id = 4, Username = "manager2", FirstName = "Mirza", LastName = "Menadzer", Email = "manager2@cutcal.com", Phone = "+38761000004", PasswordHash = passwordHash, IsActive = true, CreatedAt = seedDate, ProfileImageUrl = "https://i.pravatar.cc/150?img=4" },
-            new() { Id = 5, Username = "manager3", FirstName = "Merima", LastName = "Menadzer", Email = "manager3@cutcal.com", Phone = "+38761000005", PasswordHash = passwordHash, IsActive = true, CreatedAt = seedDate, ProfileImageUrl = "https://i.pravatar.cc/150?img=5" },
-            new() { Id = 6, Username = "customer", FirstName = "Emina", LastName = "Kupac", Email = "customer@cutcal.com", Phone = "+38761000006", PasswordHash = passwordHash, IsActive = true, CreatedAt = seedDate, ProfileImageUrl = "https://i.pravatar.cc/150?img=6" },
-            new() { Id = 7, Username = "customer2", FirstName = "Faruk", LastName = "Kupac", Email = "customer2@cutcal.com", Phone = "+38761000007", PasswordHash = passwordHash, IsActive = true, CreatedAt = seedDate, ProfileImageUrl = "https://i.pravatar.cc/150?img=7" },
-            new() { Id = 8, Username = "customer3", FirstName = "Lamija", LastName = "Kupac", Email = "customer3@cutcal.com", Phone = "+38761000008", PasswordHash = passwordHash, IsActive = true, CreatedAt = seedDate, ProfileImageUrl = "https://i.pravatar.cc/150?img=8" },
-            new() { Id = 9, Username = "customer4", FirstName = "Haris", LastName = "Kupac", Email = "customer4@cutcal.com", Phone = "+38761000009", PasswordHash = passwordHash, IsActive = true, CreatedAt = seedDate, ProfileImageUrl = "https://i.pravatar.cc/150?img=9" },
-            new() { Id = 10, Username = "customer5", FirstName = "Amina", LastName = "Kupac", Email = "customer5@cutcal.com", Phone = "+38761000010", PasswordHash = passwordHash, IsActive = true, CreatedAt = seedDate, ProfileImageUrl = "https://i.pravatar.cc/150?img=10" },
+            new() { Id = 1, Username = "admin", FirstName = "Ana", LastName = "Adminovic", Email = "admin@cutcal.com", Phone = "+38761000001", PasswordHash = passwordHash, IsActive = true, CreatedAt = seedDate, ProfileImageUrl = "/images/avatars/1.jpg" },
+            new() { Id = 2, Username = "admin2", FirstName = "Amar", LastName = "Adminovic", Email = "admin2@cutcal.com", Phone = "+38761000002", PasswordHash = passwordHash, IsActive = true, CreatedAt = seedDate, ProfileImageUrl = "/images/avatars/2.jpg" },
+            new() { Id = 3, Username = "manager", FirstName = "Maja", LastName = "Menadzer", Email = "manager@cutcal.com", Phone = "+38761000003", PasswordHash = passwordHash, IsActive = true, CreatedAt = seedDate, ProfileImageUrl = "/images/avatars/3.jpg" },
+            new() { Id = 4, Username = "manager2", FirstName = "Mirza", LastName = "Menadzer", Email = "manager2@cutcal.com", Phone = "+38761000004", PasswordHash = passwordHash, IsActive = true, CreatedAt = seedDate, ProfileImageUrl = "/images/avatars/4.jpg" },
+            new() { Id = 5, Username = "manager3", FirstName = "Merima", LastName = "Menadzer", Email = "manager3@cutcal.com", Phone = "+38761000005", PasswordHash = passwordHash, IsActive = true, CreatedAt = seedDate, ProfileImageUrl = "/images/avatars/5.jpg" },
+            new() { Id = 6, Username = "customer", FirstName = "Emina", LastName = "Kupac", Email = "customer@cutcal.com", Phone = "+38761000006", PasswordHash = passwordHash, IsActive = true, CreatedAt = seedDate, ProfileImageUrl = "/images/avatars/6.jpg" },
+            new() { Id = 7, Username = "customer2", FirstName = "Faruk", LastName = "Kupac", Email = "customer2@cutcal.com", Phone = "+38761000007", PasswordHash = passwordHash, IsActive = true, CreatedAt = seedDate, ProfileImageUrl = "/images/avatars/7.jpg" },
+            new() { Id = 8, Username = "customer3", FirstName = "Lamija", LastName = "Kupac", Email = "customer3@cutcal.com", Phone = "+38761000008", PasswordHash = passwordHash, IsActive = true, CreatedAt = seedDate, ProfileImageUrl = "/images/avatars/8.jpg" },
+            new() { Id = 9, Username = "customer4", FirstName = "Haris", LastName = "Kupac", Email = "customer4@cutcal.com", Phone = "+38761000009", PasswordHash = passwordHash, IsActive = true, CreatedAt = seedDate, ProfileImageUrl = "/images/avatars/9.jpg" },
+            new() { Id = 10, Username = "customer5", FirstName = "Amina", LastName = "Kupac", Email = "customer5@cutcal.com", Phone = "+38761000010", PasswordHash = passwordHash, IsActive = true, CreatedAt = seedDate, ProfileImageUrl = "/images/avatars/10.jpg" },
         };
         var staffFirstNames = new[] { "Selma", "Tarik", "Ajla", "Kenan", "Dino", "Nejra", "Ismar", "Belma" };
         var staffLastNames = new[] { "Hodzic", "Begic", "Suljic", "Delic", "Karic", "Osmic", "Kovac", "Halilovic" };
@@ -66,7 +66,7 @@ public static class CutCalSeed
                 PasswordHash = passwordHash,
                 IsActive = true,
                 CreatedAt = seedDate,
-                ProfileImageUrl = $"https://i.pravatar.cc/150?img={11 + i}"
+                ProfileImageUrl = $"/images/avatars/{11 + i}.jpg"
             });
         }
         modelBuilder.Entity<User>().HasData(users);
@@ -92,11 +92,11 @@ public static class CutCalSeed
 
         var salonImageUrls = new[]
         {
-            "https://images.unsplash.com/photo-1560066984-138dadb4c035",
-            "https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f",
-            "https://images.unsplash.com/photo-1522337660859-02fbefca4702",
-            "https://images.unsplash.com/photo-1516975080664-ed2fc6a32937",
-            "https://images.unsplash.com/photo-1585747860715-2ba37e788b70",
+            "/images/salons/bellissima-hair-studio-cover.jpg",
+            "/images/salons/gentlemans-cut-barbershop-cover.jpg",
+            "/images/salons/glow-beauty-studio-cover.jpg",
+            "/images/salons/perfect-nails-studio-cover.jpg",
+            "/images/salons/relax-and-spa-cover.jpg",
         };
         var salonNames = new[] { "Bellissima Hair Studio", "Gentleman's Cut Barbershop", "Glow Beauty Studio", "Perfect Nails Studio", "Relax & Spa" };
         var salonOwners = new[] { 3, 4, 5, 3, 4 };
@@ -155,18 +155,21 @@ public static class CutCalSeed
         }
         modelBuilder.Entity<SalonWorkingHours>().HasData(workingHours);
 
-        var galleryImages = new[]
+        var galleryImagesBySalon = new[]
         {
-            "https://images.unsplash.com/photo-1562322140-8baeececf3df",
-            "https://images.unsplash.com/photo-1493256338651-d82f7acb2b38",
+            new[] { "/images/salons/bellissima-hair-studio-1.jpg", "/images/salons/bellissima-hair-studio-2.jpg" },
+            new[] { "/images/salons/gentlemans-cut-barbershop-1.jpg", "/images/salons/gentlemans-cut-barbershop-2.jpg" },
+            new[] { "/images/salons/glow-beauty-studio-1.jpg", "/images/salons/glow-beauty-studio-2.jpg" },
+            new[] { "/images/salons/perfect-nails-studio-1.jpg", "/images/salons/perfect-nails-studio-2.jpg" },
+            new[] { "/images/salons/relax-and-spa-1.jpg", "/images/salons/relax-and-spa-2.jpg" },
         };
         var gallery = new List<SalonGallery>();
         var galId = 1;
         for (var s = 1; s <= 5; s++)
         {
-            for (var g = 0; g < 2; g++)
+            foreach (var imageUrl in galleryImagesBySalon[s - 1])
             {
-                gallery.Add(new SalonGallery { Id = galId++, SalonId = s, ImageUrl = galleryImages[g], Caption = "Interior", UploadedAt = seedDate });
+                gallery.Add(new SalonGallery { Id = galId++, SalonId = s, ImageUrl = imageUrl, Caption = "Interior", UploadedAt = seedDate });
             }
         }
         modelBuilder.Entity<SalonGallery>().HasData(gallery);
@@ -226,7 +229,7 @@ public static class CutCalSeed
                     UserId = staffUserId,
                     Role = "Stylist",
                     Bio = "Experienced professional.",
-                    ProfileImageUrl = $"https://i.pravatar.cc/150?img={10 + staffId}",
+                    ProfileImageUrl = $"/images/avatars/{10 + staffId}.jpg",
                     IsActive = true
                 });
                 foreach (var serviceId in salonServiceMap[salonId])

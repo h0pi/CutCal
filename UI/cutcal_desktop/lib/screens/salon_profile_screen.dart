@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../providers/entity_providers.dart';
 import '../utils/utils_widgets.dart';
+import '../utils/image_url.dart';
 
 class SalonProfileScreen extends StatefulWidget {
   const SalonProfileScreen({super.key});
@@ -127,7 +128,7 @@ class _SalonProfileScreenState extends State<SalonProfileScreen> {
             children: [
               CircleAvatar(
                 radius: 40,
-                backgroundImage: _selectedSalon!.profileImageUrl != null ? NetworkImage(_selectedSalon!.profileImageUrl!) : null,
+                backgroundImage: _selectedSalon!.profileImageUrl != null ? NetworkImage(resolveImageUrl(_selectedSalon!.profileImageUrl!)) : null,
               ),
               const SizedBox(width: 16),
               OutlinedButton.icon(icon: const Icon(Icons.upload), label: const Text('Change photo'), onPressed: () {}),
@@ -166,7 +167,7 @@ class _SalonProfileScreenState extends State<SalonProfileScreen> {
             children: _gallery
                 .map((g) => ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.network(g.imageUrl, width: 120, height: 90, fit: BoxFit.cover),
+                      child: Image.network(resolveImageUrl(g.imageUrl), width: 120, height: 90, fit: BoxFit.cover),
                     ))
                 .toList(),
           ),

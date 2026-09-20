@@ -140,6 +140,16 @@ public class FavoriteConfiguration : IEntityTypeConfiguration<Favorite>
     }
 }
 
+public class SalonViewConfiguration : IEntityTypeConfiguration<SalonView>
+{
+    public void Configure(EntityTypeBuilder<SalonView> builder)
+    {
+        builder.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne(x => x.Salon).WithMany().HasForeignKey(x => x.SalonId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasIndex(x => new { x.UserId, x.SalonId });
+    }
+}
+
 public class UserSearchHistoryConfiguration : IEntityTypeConfiguration<UserSearchHistory>
 {
     public void Configure(EntityTypeBuilder<UserSearchHistory> builder)

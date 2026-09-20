@@ -6,6 +6,7 @@ import '../../providers/entity_providers.dart';
 import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/utils_widgets.dart';
+import '../../utils/image_url.dart';
 
 class ManagerStaffScreen extends StatefulWidget {
   const ManagerStaffScreen({super.key});
@@ -175,7 +176,7 @@ class _ManagerStaffScreenState extends State<ManagerStaffScreen> {
                           CircleAvatar(
                             radius: 24,
                             backgroundColor: AppColors.primaryLight,
-                            backgroundImage: s.profileImageUrl != null ? NetworkImage(s.profileImageUrl!) : null,
+                            backgroundImage: s.profileImageUrl != null ? NetworkImage(resolveImageUrl(s.profileImageUrl!)) : null,
                             child: s.profileImageUrl == null
                                 ? Text(
                                     (s.fullName?.isNotEmpty == true ? s.fullName![0] : '?').toUpperCase(),

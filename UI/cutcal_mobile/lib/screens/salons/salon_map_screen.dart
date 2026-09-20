@@ -8,6 +8,7 @@ import '../../providers/entity_providers.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/utils_widgets.dart';
 import 'salon_detail_screen.dart';
+import '../../utils/image_url.dart';
 
 // Default camera fallback (Sarajevo) used when location permission is denied
 // or unavailable, so the map still opens somewhere sensible.
@@ -173,7 +174,7 @@ class _SalonPreviewCard extends StatelessWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: salon.profileImageUrl != null
-                      ? Image.network(salon.profileImageUrl!, width: 56, height: 56, fit: BoxFit.cover, cacheWidth: 150)
+                      ? Image.network(resolveImageUrl(salon.profileImageUrl!), width: 56, height: 56, fit: BoxFit.cover, cacheWidth: 150)
                       : Container(width: 56, height: 56, color: AppColors.primaryLight, child: const Icon(Icons.storefront, color: AppColors.primary)),
                 ),
                 const SizedBox(width: 12),

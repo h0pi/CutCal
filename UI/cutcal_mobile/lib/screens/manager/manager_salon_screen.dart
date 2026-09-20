@@ -10,6 +10,7 @@ import '../../utils/app_theme.dart';
 import '../../utils/utils_widgets.dart';
 import '../auth/login_screen.dart';
 import 'manager_reviews_screen.dart';
+import '../../utils/image_url.dart';
 
 const _dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -201,7 +202,7 @@ class _ManagerSalonScreenState extends State<ManagerSalonScreen> {
                           image: _pickedCover != null
                               ? DecorationImage(image: NetworkImage(_pickedCover!.path), fit: BoxFit.cover)
                               : _salon!.profileImageUrl != null
-                                  ? DecorationImage(image: NetworkImage(_salon!.profileImageUrl!), fit: BoxFit.cover)
+                                  ? DecorationImage(image: NetworkImage(resolveImageUrl(_salon!.profileImageUrl!)), fit: BoxFit.cover)
                                   : null,
                         ),
                         child: (_pickedCover == null && _salon!.profileImageUrl == null)

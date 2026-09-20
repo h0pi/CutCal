@@ -4,11 +4,14 @@ import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../providers/entity_providers.dart';
+import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/utils_widgets.dart';
 import '../appointments/booking_screen.dart';
+import '../../utils/image_url.dart';
 
-const _dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+// Indexed by the backend day-of-week value (0 = Sunday).
+const _dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 // Plain Containers (not Card) are used for the info/hours/review sections, so they
 // need their own subtle separation from the near-white scaffold background.
@@ -44,6 +47,16 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   void initState() {
     super.initState();
     _load();
+    _logView();
+  }
+
+  // Feeds the recommender; a failure must never get in the way of browsing.
+  Future<void> _logView() async {
+    try {
+      await context.read<SalonProvider>().logView(widget.salonId);
+    } on ApiClientException catch (e) {
+      debugPrint('Could not log salon view: ${e.message}');
+    }
   }
 
   Future<void> _load() async {
@@ -89,7 +102,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     return '${parts[0]}:${parts[1]}';
   }
 
-  bool _isToday(int dayOfWeek) => dayOfWeek == DateTime.now().weekday - 1;
+  bool _isToday(int dayOfWeek) => dayOfWeek == DateTime.now().weekday % 7;
 
   @override
   Widget build(BuildContext context) {
@@ -204,7 +217,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                                 CircleAvatar(
                                   radius: 26,
                                   backgroundColor: AppColors.primaryLight,
-                                  backgroundImage: s.profileImageUrl != null ? NetworkImage(s.profileImageUrl!) : null,
+                                  backgroundImage: s.profileImageUrl != null ? NetworkImage(resolveImageUrl(s.profileImageUrl!)) : null,
                                   child: s.profileImageUrl == null ? const Icon(Icons.person, color: AppColors.primary) : null,
                                 ),
                                 const SizedBox(height: 6),
@@ -340,7 +353,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           ),
           items: images
               .map((url) => Image.network(
-                    url,
+                    resolveImageUrl(url),
                     fit: BoxFit.cover,
                     width: double.infinity,
                     cacheWidth: 800,
@@ -394,7 +407,8 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   }
 
   Widget _buildWorkingHoursCard(SalonModel salon) {
-    final sortedHours = salon.workingHours.toList()..sort((a, b) => a.dayOfWeek.compareTo(b.dayOfWeek));
+    // Show Monday first, Sunday last.
+    final sortedHours = salon.workingHours.toList()..sort((a, b) => ((a.dayOfWeek + 6) % 7).compareTo((b.dayOfWeek + 6) % 7));
     final todayHours = sortedHours.where((wh) => _isToday(wh.dayOfWeek)).firstOrNull;
 
     return Container(

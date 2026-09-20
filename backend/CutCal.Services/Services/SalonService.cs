@@ -17,10 +17,13 @@ public interface ISalonService : IBaseCRUDService<SalonResponse, SalonSearchObje
     Task<List<SalonGalleryResponse>> GetGalleryAsync(int salonId);
     Task<SalonGalleryResponse> AddGalleryImageAsync(int salonId, SalonGalleryInsertRequest request);
     Task LogCategorySearchAsync(int userId, int categoryId);
+    Task LogViewAsync(int userId, int salonId);
 }
 
 public class SalonManagementService : BaseCRUDService<Salon, SalonResponse, SalonSearchObject, SalonInsertRequest, SalonUpdateRequest>, ISalonService
 {
+    private const int ViewDedupeMinutes = 10;
+
     private readonly IAuthenticatedUserAccessor _userAccessor;
 
     public SalonManagementService(CutCalDbContext context, IAuthenticatedUserAccessor userAccessor) : base(context)
@@ -199,6 +202,24 @@ public class SalonManagementService : BaseCRUDService<Salon, SalonResponse, Salo
             SalonCategoryId = categoryId,
             SearchedAt = DateTime.UtcNow
         });
+        await Context.SaveChangesAsync();
+    }
+
+    public async Task LogViewAsync(int userId, int salonId)
+    {
+        if (!await Context.Salons.AnyAsync(x => x.Id == salonId && x.IsApproved))
+        {
+            throw new ClientException("Salon not found.");
+        }
+
+        // Re-opening the same salon within minutes is one interest signal, not several.
+        var recentCutoff = DateTime.UtcNow.AddMinutes(-ViewDedupeMinutes);
+        if (await Context.SalonViews.AnyAsync(x => x.UserId == userId && x.SalonId == salonId && x.ViewedAt >= recentCutoff))
+        {
+            return;
+        }
+
+        Context.SalonViews.Add(new SalonView { UserId = userId, SalonId = salonId, ViewedAt = DateTime.UtcNow });
         await Context.SaveChangesAsync();
     }
 

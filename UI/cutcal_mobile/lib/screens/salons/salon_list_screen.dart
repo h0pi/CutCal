@@ -5,12 +5,15 @@ import 'package:provider/provider.dart';
 import '../../models/models.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/entity_providers.dart';
+import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/utils_widgets.dart';
 import 'salon_detail_screen.dart';
+import '../../utils/image_url.dart';
 
 // Images are network-loaded; bounded via cacheWidth to keep decode cost low.
 const bool kShowSalonImages = true;
+const int _maxRecommendations = 5;
 
 class SalonListScreen extends StatefulWidget {
   const SalonListScreen({super.key});
@@ -24,6 +27,7 @@ class _SalonListScreenState extends State<SalonListScreen> {
   List<SalonCategoryModel> _categories = [];
   int? _selectedCategoryId;
   List<SalonModel> _salons = [];
+  List<RecommendationModel> _recommendations = [];
   int _page = 0;
   bool _isLoading = false;
   bool _hasMore = true;
@@ -36,6 +40,7 @@ class _SalonListScreenState extends State<SalonListScreen> {
     _loadCategories();
     _determineLocation();
     _loadSalons(reset: true);
+    _loadRecommendations();
   }
 
   Future<void> _determineLocation() async {
@@ -54,10 +59,22 @@ class _SalonListScreenState extends State<SalonListScreen> {
         _lng = position.longitude;
       });
       _loadSalons(reset: true);
+      _loadRecommendations();
     } catch (_) {
       // Distance just won't be shown; the rest of the screen still works.
     }
   }
+
+  Future<void> _loadRecommendations() async {
+    try {
+      final result = await context.read<RecommendationProvider>().getRecommendations(lat: _lat, lng: _lng);
+      if (mounted) setState(() => _recommendations = result.take(_maxRecommendations).toList());
+    } on ApiClientException catch (e) {
+      debugPrint('Could not load recommendations: ${e.message}');
+    }
+  }
+
+  bool get _showRecommendations => _recommendations.isNotEmpty && _selectedCategoryId == null && _searchController.text.isEmpty;
 
   Future<void> _loadCategories() async {
     final result = await context.read<SalonCategoryProvider>().get();
@@ -129,6 +146,7 @@ class _SalonListScreenState extends State<SalonListScreen> {
               ),
             ),
           ),
+          if (_showRecommendations) SliverToBoxAdapter(child: _buildRecommendations()),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             sliver: SliverToBoxAdapter(
@@ -233,6 +251,35 @@ class _SalonListScreenState extends State<SalonListScreen> {
     );
   }
 
+  Widget _buildRecommendations() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 8, 16, 10),
+          child: Row(
+            children: [
+              Icon(Icons.auto_awesome, size: 18, color: AppColors.primary),
+              SizedBox(width: 6),
+              Text('Recommended for you', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 250,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: _recommendations.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, i) => _RecommendationCard(recommendation: _recommendations[i]),
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
   Widget _categoryChip(int? id, String label) {
     final selected = _selectedCategoryId == id;
     return Padding(
@@ -249,6 +296,85 @@ class _SalonListScreenState extends State<SalonListScreen> {
   }
 }
 
+class _RecommendationCard extends StatelessWidget {
+  final RecommendationModel recommendation;
+
+  const _RecommendationCard({required this.recommendation});
+
+  @override
+  Widget build(BuildContext context) {
+    final salon = recommendation.salon;
+    return SizedBox(
+      width: 270,
+      child: Card(
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => SalonDetailScreen(salonId: salon.id, initialDistanceKm: salon.distanceKm)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
+                children: [
+                  SizedBox(
+                    height: 100,
+                    width: double.infinity,
+                    child: (kShowSalonImages && salon.profileImageUrl != null)
+                        ? Image.network(
+                            resolveImageUrl(salon.profileImageUrl!),
+                            fit: BoxFit.cover,
+                            cacheWidth: 400,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              color: AppColors.primaryLight,
+                              alignment: Alignment.center,
+                              child: const Icon(Icons.storefront, size: 32, color: AppColors.primary),
+                            ),
+                          )
+                        : Container(color: AppColors.primaryLight, child: const Icon(Icons.storefront, size: 32, color: AppColors.primary)),
+                  ),
+                  Positioned(top: 8, right: 8, child: RatingBadge(rating: salon.avgRating)),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        salon.name,
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (salon.minServicePrice != null)
+                      Text('from \$${salon.minServicePrice!.toStringAsFixed(0)}', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: AppColors.primaryLight, borderRadius: BorderRadius.circular(10)),
+                  child: Text(
+                    recommendation.reason,
+                    style: const TextStyle(color: AppColors.primaryDark, fontSize: 11.5, height: 1.3),
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _SalonCard extends StatelessWidget {
   final SalonModel salon;
 
@@ -256,7 +382,7 @@ class _SalonCard extends StatelessWidget {
 
   bool? get _isOpenNow {
     if (salon.workingHours.isEmpty) return null;
-    final backendDay = DateTime.now().weekday - 1;
+    final backendDay = DateTime.now().weekday % 7;
     final today = salon.workingHours.where((wh) => wh.dayOfWeek == backendDay).firstOrNull;
     if (today == null || today.isClosed || today.openTime == null || today.closeTime == null) return false;
 
@@ -270,7 +396,7 @@ class _SalonCard extends StatelessWidget {
   }
 
   String? get _closeTimeLabel {
-    final backendDay = DateTime.now().weekday - 1;
+    final backendDay = DateTime.now().weekday % 7;
     final today = salon.workingHours.where((wh) => wh.dayOfWeek == backendDay).firstOrNull;
     if (today == null || today.closeTime == null) return null;
     final parts = today.closeTime!.split(':');
@@ -321,7 +447,7 @@ class _SalonCard extends StatelessWidget {
                   width: double.infinity,
                   child: (kShowSalonImages && salon.profileImageUrl != null)
                       ? Image.network(
-                          salon.profileImageUrl!,
+                          resolveImageUrl(salon.profileImageUrl!),
                           fit: BoxFit.cover,
                           cacheWidth: 400,
                           loadingBuilder: (context, child, progress) {

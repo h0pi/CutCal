@@ -233,6 +233,16 @@ public class Favorite
     public DateTime SavedAt { get; set; } = DateTime.UtcNow;
 }
 
+public class SalonView
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public User User { get; set; } = null!;
+    public int SalonId { get; set; }
+    public Salon Salon { get; set; } = null!;
+    public DateTime ViewedAt { get; set; } = DateTime.UtcNow;
+}
+
 public class UserSearchHistory
 {
     public int Id { get; set; }

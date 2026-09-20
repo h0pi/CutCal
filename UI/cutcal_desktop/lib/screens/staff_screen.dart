@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../providers/entity_providers.dart';
 import '../utils/utils_widgets.dart';
+import '../utils/image_url.dart';
 
 class StaffScreen extends StatefulWidget {
   const StaffScreen({super.key});
@@ -173,7 +174,7 @@ class _StaffScreenState extends State<StaffScreen> {
                       final s = _staff[index];
                       return Card(
                         child: ListTile(
-                          leading: CircleAvatar(backgroundImage: s.profileImageUrl != null ? NetworkImage(s.profileImageUrl!) : null),
+                          leading: CircleAvatar(backgroundImage: s.profileImageUrl != null ? NetworkImage(resolveImageUrl(s.profileImageUrl!)) : null),
                           title: Text(s.fullName ?? 'Staff #${s.id}'),
                           subtitle: Text('${s.role} • ${s.serviceIds.length} service(s)'),
                           trailing: Icon(s.isActive ? Icons.check_circle : Icons.pause_circle, color: s.isActive ? Colors.green : Colors.grey),

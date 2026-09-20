@@ -28,6 +28,8 @@ for (var i = 0; i < 5 && envDir is not null; i++)
     envDir = envDir.Parent;
 }
 
+const int StaticFileCacheSeconds = 60 * 60 * 24 * 7;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. HttpContextAccessor
@@ -161,6 +163,12 @@ app.UseSwaggerUI(options =>
 });
 
 app.UseCors("AllowFlutterWebClient");
+
+// Seed/uploaded images live in wwwroot/images; long cache lifetime so clients don't re-download them.
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = $"public,max-age={StaticFileCacheSeconds}"
+});
 
 app.UseAuthentication();
 app.UseAuthorization();

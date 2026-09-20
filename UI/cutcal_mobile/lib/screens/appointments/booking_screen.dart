@@ -7,6 +7,7 @@ import '../../providers/entity_providers.dart';
 import '../../utils/app_theme.dart';
 import 'availability_picker.dart';
 import 'payment_screen.dart';
+import '../../utils/image_url.dart';
 
 class BookingScreen extends StatefulWidget {
   final SalonModel salon;
@@ -174,7 +175,7 @@ class _BookingScreenState extends State<BookingScreen> {
               leading: CircleAvatar(
                 radius: 18,
                 backgroundColor: AppColors.primaryLight,
-                backgroundImage: s.profileImageUrl != null ? NetworkImage(s.profileImageUrl!) : null,
+                backgroundImage: s.profileImageUrl != null ? NetworkImage(resolveImageUrl(s.profileImageUrl!)) : null,
                 child: s.profileImageUrl == null ? const Icon(Icons.person, size: 18, color: AppColors.primary) : null,
               ),
               title: s.fullName ?? 'Staff #${s.id}',

@@ -4,6 +4,7 @@ using CutCal.Services.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CutCal.Services.Database.Migrations
 {
     [DbContext(typeof(CutCalDbContext))]
-    partial class CutCalDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260920132234_AddSalonViews")]
+    partial class AddSalonViews
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -886,7 +889,7 @@ namespace CutCal.Services.Database.Migrations
                             Name = "Bellissima Hair Studio",
                             OwnerId = 3,
                             Phone = "+3876210000",
-                            ProfileImageUrl = "/images/salons/bellissima-hair-studio-cover.jpg",
+                            ProfileImageUrl = "https://images.unsplash.com/photo-1560066984-138dadb4c035",
                             SalonCategoryId = 1
                         },
                         new
@@ -905,7 +908,7 @@ namespace CutCal.Services.Database.Migrations
                             Name = "Gentleman's Cut Barbershop",
                             OwnerId = 4,
                             Phone = "+3876210001",
-                            ProfileImageUrl = "/images/salons/gentlemans-cut-barbershop-cover.jpg",
+                            ProfileImageUrl = "https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f",
                             SalonCategoryId = 2
                         },
                         new
@@ -924,7 +927,7 @@ namespace CutCal.Services.Database.Migrations
                             Name = "Glow Beauty Studio",
                             OwnerId = 5,
                             Phone = "+3876210002",
-                            ProfileImageUrl = "/images/salons/glow-beauty-studio-cover.jpg",
+                            ProfileImageUrl = "https://images.unsplash.com/photo-1522337660859-02fbefca4702",
                             SalonCategoryId = 3
                         },
                         new
@@ -943,7 +946,7 @@ namespace CutCal.Services.Database.Migrations
                             Name = "Perfect Nails Studio",
                             OwnerId = 3,
                             Phone = "+3876210003",
-                            ProfileImageUrl = "/images/salons/perfect-nails-studio-cover.jpg",
+                            ProfileImageUrl = "https://images.unsplash.com/photo-1516975080664-ed2fc6a32937",
                             SalonCategoryId = 4
                         },
                         new
@@ -962,7 +965,7 @@ namespace CutCal.Services.Database.Migrations
                             Name = "Relax & Spa",
                             OwnerId = 4,
                             Phone = "+3876210004",
-                            ProfileImageUrl = "/images/salons/relax-and-spa-cover.jpg",
+                            ProfileImageUrl = "https://images.unsplash.com/photo-1585747860715-2ba37e788b70",
                             SalonCategoryId = 5
                         });
                 });
@@ -1043,7 +1046,7 @@ namespace CutCal.Services.Database.Migrations
                         {
                             Id = 1,
                             Caption = "Interior",
-                            ImageUrl = "/images/salons/bellissima-hair-studio-1.jpg",
+                            ImageUrl = "https://images.unsplash.com/photo-1562322140-8baeececf3df",
                             SalonId = 1,
                             UploadedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -1051,7 +1054,7 @@ namespace CutCal.Services.Database.Migrations
                         {
                             Id = 2,
                             Caption = "Interior",
-                            ImageUrl = "/images/salons/bellissima-hair-studio-2.jpg",
+                            ImageUrl = "https://images.unsplash.com/photo-1493256338651-d82f7acb2b38",
                             SalonId = 1,
                             UploadedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -1059,7 +1062,7 @@ namespace CutCal.Services.Database.Migrations
                         {
                             Id = 3,
                             Caption = "Interior",
-                            ImageUrl = "/images/salons/gentlemans-cut-barbershop-1.jpg",
+                            ImageUrl = "https://images.unsplash.com/photo-1562322140-8baeececf3df",
                             SalonId = 2,
                             UploadedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -1067,7 +1070,7 @@ namespace CutCal.Services.Database.Migrations
                         {
                             Id = 4,
                             Caption = "Interior",
-                            ImageUrl = "/images/salons/gentlemans-cut-barbershop-2.jpg",
+                            ImageUrl = "https://images.unsplash.com/photo-1493256338651-d82f7acb2b38",
                             SalonId = 2,
                             UploadedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -1075,7 +1078,7 @@ namespace CutCal.Services.Database.Migrations
                         {
                             Id = 5,
                             Caption = "Interior",
-                            ImageUrl = "/images/salons/glow-beauty-studio-1.jpg",
+                            ImageUrl = "https://images.unsplash.com/photo-1562322140-8baeececf3df",
                             SalonId = 3,
                             UploadedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -1083,7 +1086,7 @@ namespace CutCal.Services.Database.Migrations
                         {
                             Id = 6,
                             Caption = "Interior",
-                            ImageUrl = "/images/salons/glow-beauty-studio-2.jpg",
+                            ImageUrl = "https://images.unsplash.com/photo-1493256338651-d82f7acb2b38",
                             SalonId = 3,
                             UploadedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -1091,7 +1094,7 @@ namespace CutCal.Services.Database.Migrations
                         {
                             Id = 7,
                             Caption = "Interior",
-                            ImageUrl = "/images/salons/perfect-nails-studio-1.jpg",
+                            ImageUrl = "https://images.unsplash.com/photo-1562322140-8baeececf3df",
                             SalonId = 4,
                             UploadedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -1099,7 +1102,7 @@ namespace CutCal.Services.Database.Migrations
                         {
                             Id = 8,
                             Caption = "Interior",
-                            ImageUrl = "/images/salons/perfect-nails-studio-2.jpg",
+                            ImageUrl = "https://images.unsplash.com/photo-1493256338651-d82f7acb2b38",
                             SalonId = 4,
                             UploadedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -1107,7 +1110,7 @@ namespace CutCal.Services.Database.Migrations
                         {
                             Id = 9,
                             Caption = "Interior",
-                            ImageUrl = "/images/salons/relax-and-spa-1.jpg",
+                            ImageUrl = "https://images.unsplash.com/photo-1562322140-8baeececf3df",
                             SalonId = 5,
                             UploadedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -1115,7 +1118,7 @@ namespace CutCal.Services.Database.Migrations
                         {
                             Id = 10,
                             Caption = "Interior",
-                            ImageUrl = "/images/salons/relax-and-spa-2.jpg",
+                            ImageUrl = "https://images.unsplash.com/photo-1493256338651-d82f7acb2b38",
                             SalonId = 5,
                             UploadedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         });
@@ -1711,7 +1714,7 @@ namespace CutCal.Services.Database.Migrations
                             Id = 1,
                             Bio = "Experienced professional.",
                             IsActive = true,
-                            ProfileImageUrl = "/images/avatars/11.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=11",
                             Role = "Stylist",
                             SalonId = 1,
                             UserId = 11
@@ -1721,7 +1724,7 @@ namespace CutCal.Services.Database.Migrations
                             Id = 2,
                             Bio = "Experienced professional.",
                             IsActive = true,
-                            ProfileImageUrl = "/images/avatars/12.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=12",
                             Role = "Stylist",
                             SalonId = 1,
                             UserId = 12
@@ -1731,7 +1734,7 @@ namespace CutCal.Services.Database.Migrations
                             Id = 3,
                             Bio = "Experienced professional.",
                             IsActive = true,
-                            ProfileImageUrl = "/images/avatars/13.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=13",
                             Role = "Stylist",
                             SalonId = 2,
                             UserId = 13
@@ -1741,7 +1744,7 @@ namespace CutCal.Services.Database.Migrations
                             Id = 4,
                             Bio = "Experienced professional.",
                             IsActive = true,
-                            ProfileImageUrl = "/images/avatars/14.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=14",
                             Role = "Stylist",
                             SalonId = 2,
                             UserId = 14
@@ -1751,7 +1754,7 @@ namespace CutCal.Services.Database.Migrations
                             Id = 5,
                             Bio = "Experienced professional.",
                             IsActive = true,
-                            ProfileImageUrl = "/images/avatars/15.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=15",
                             Role = "Stylist",
                             SalonId = 3,
                             UserId = 15
@@ -1761,7 +1764,7 @@ namespace CutCal.Services.Database.Migrations
                             Id = 6,
                             Bio = "Experienced professional.",
                             IsActive = true,
-                            ProfileImageUrl = "/images/avatars/16.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=16",
                             Role = "Stylist",
                             SalonId = 3,
                             UserId = 16
@@ -1771,7 +1774,7 @@ namespace CutCal.Services.Database.Migrations
                             Id = 7,
                             Bio = "Experienced professional.",
                             IsActive = true,
-                            ProfileImageUrl = "/images/avatars/17.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=17",
                             Role = "Stylist",
                             SalonId = 4,
                             UserId = 17
@@ -1781,7 +1784,7 @@ namespace CutCal.Services.Database.Migrations
                             Id = 8,
                             Bio = "Experienced professional.",
                             IsActive = true,
-                            ProfileImageUrl = "/images/avatars/18.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=18",
                             Role = "Stylist",
                             SalonId = 5,
                             UserId = 18
@@ -1986,7 +1989,7 @@ namespace CutCal.Services.Database.Migrations
                             LastName = "Adminovic",
                             PasswordHash = "$2a$12$enAQ2S4KvMzecXNse01PGOPLjEntlavBY44cH68GLTAYzmO3Q1lr.",
                             Phone = "+38761000001",
-                            ProfileImageUrl = "/images/avatars/1.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=1",
                             Username = "admin"
                         },
                         new
@@ -1999,7 +2002,7 @@ namespace CutCal.Services.Database.Migrations
                             LastName = "Adminovic",
                             PasswordHash = "$2a$12$enAQ2S4KvMzecXNse01PGOPLjEntlavBY44cH68GLTAYzmO3Q1lr.",
                             Phone = "+38761000002",
-                            ProfileImageUrl = "/images/avatars/2.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=2",
                             Username = "admin2"
                         },
                         new
@@ -2012,7 +2015,7 @@ namespace CutCal.Services.Database.Migrations
                             LastName = "Menadzer",
                             PasswordHash = "$2a$12$enAQ2S4KvMzecXNse01PGOPLjEntlavBY44cH68GLTAYzmO3Q1lr.",
                             Phone = "+38761000003",
-                            ProfileImageUrl = "/images/avatars/3.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=3",
                             Username = "manager"
                         },
                         new
@@ -2025,7 +2028,7 @@ namespace CutCal.Services.Database.Migrations
                             LastName = "Menadzer",
                             PasswordHash = "$2a$12$enAQ2S4KvMzecXNse01PGOPLjEntlavBY44cH68GLTAYzmO3Q1lr.",
                             Phone = "+38761000004",
-                            ProfileImageUrl = "/images/avatars/4.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=4",
                             Username = "manager2"
                         },
                         new
@@ -2038,7 +2041,7 @@ namespace CutCal.Services.Database.Migrations
                             LastName = "Menadzer",
                             PasswordHash = "$2a$12$enAQ2S4KvMzecXNse01PGOPLjEntlavBY44cH68GLTAYzmO3Q1lr.",
                             Phone = "+38761000005",
-                            ProfileImageUrl = "/images/avatars/5.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=5",
                             Username = "manager3"
                         },
                         new
@@ -2051,7 +2054,7 @@ namespace CutCal.Services.Database.Migrations
                             LastName = "Kupac",
                             PasswordHash = "$2a$12$enAQ2S4KvMzecXNse01PGOPLjEntlavBY44cH68GLTAYzmO3Q1lr.",
                             Phone = "+38761000006",
-                            ProfileImageUrl = "/images/avatars/6.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=6",
                             Username = "customer"
                         },
                         new
@@ -2064,7 +2067,7 @@ namespace CutCal.Services.Database.Migrations
                             LastName = "Kupac",
                             PasswordHash = "$2a$12$enAQ2S4KvMzecXNse01PGOPLjEntlavBY44cH68GLTAYzmO3Q1lr.",
                             Phone = "+38761000007",
-                            ProfileImageUrl = "/images/avatars/7.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=7",
                             Username = "customer2"
                         },
                         new
@@ -2077,7 +2080,7 @@ namespace CutCal.Services.Database.Migrations
                             LastName = "Kupac",
                             PasswordHash = "$2a$12$enAQ2S4KvMzecXNse01PGOPLjEntlavBY44cH68GLTAYzmO3Q1lr.",
                             Phone = "+38761000008",
-                            ProfileImageUrl = "/images/avatars/8.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=8",
                             Username = "customer3"
                         },
                         new
@@ -2090,7 +2093,7 @@ namespace CutCal.Services.Database.Migrations
                             LastName = "Kupac",
                             PasswordHash = "$2a$12$enAQ2S4KvMzecXNse01PGOPLjEntlavBY44cH68GLTAYzmO3Q1lr.",
                             Phone = "+38761000009",
-                            ProfileImageUrl = "/images/avatars/9.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=9",
                             Username = "customer4"
                         },
                         new
@@ -2103,7 +2106,7 @@ namespace CutCal.Services.Database.Migrations
                             LastName = "Kupac",
                             PasswordHash = "$2a$12$enAQ2S4KvMzecXNse01PGOPLjEntlavBY44cH68GLTAYzmO3Q1lr.",
                             Phone = "+38761000010",
-                            ProfileImageUrl = "/images/avatars/10.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=10",
                             Username = "customer5"
                         },
                         new
@@ -2116,7 +2119,7 @@ namespace CutCal.Services.Database.Migrations
                             LastName = "Hodzic",
                             PasswordHash = "$2a$12$enAQ2S4KvMzecXNse01PGOPLjEntlavBY44cH68GLTAYzmO3Q1lr.",
                             Phone = "+38761100011",
-                            ProfileImageUrl = "/images/avatars/11.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=11",
                             Username = "staff1"
                         },
                         new
@@ -2129,7 +2132,7 @@ namespace CutCal.Services.Database.Migrations
                             LastName = "Begic",
                             PasswordHash = "$2a$12$enAQ2S4KvMzecXNse01PGOPLjEntlavBY44cH68GLTAYzmO3Q1lr.",
                             Phone = "+38761100012",
-                            ProfileImageUrl = "/images/avatars/12.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=12",
                             Username = "staff2"
                         },
                         new
@@ -2142,7 +2145,7 @@ namespace CutCal.Services.Database.Migrations
                             LastName = "Suljic",
                             PasswordHash = "$2a$12$enAQ2S4KvMzecXNse01PGOPLjEntlavBY44cH68GLTAYzmO3Q1lr.",
                             Phone = "+38761100013",
-                            ProfileImageUrl = "/images/avatars/13.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=13",
                             Username = "staff3"
                         },
                         new
@@ -2155,7 +2158,7 @@ namespace CutCal.Services.Database.Migrations
                             LastName = "Delic",
                             PasswordHash = "$2a$12$enAQ2S4KvMzecXNse01PGOPLjEntlavBY44cH68GLTAYzmO3Q1lr.",
                             Phone = "+38761100014",
-                            ProfileImageUrl = "/images/avatars/14.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=14",
                             Username = "staff4"
                         },
                         new
@@ -2168,7 +2171,7 @@ namespace CutCal.Services.Database.Migrations
                             LastName = "Karic",
                             PasswordHash = "$2a$12$enAQ2S4KvMzecXNse01PGOPLjEntlavBY44cH68GLTAYzmO3Q1lr.",
                             Phone = "+38761100015",
-                            ProfileImageUrl = "/images/avatars/15.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=15",
                             Username = "staff5"
                         },
                         new
@@ -2181,7 +2184,7 @@ namespace CutCal.Services.Database.Migrations
                             LastName = "Osmic",
                             PasswordHash = "$2a$12$enAQ2S4KvMzecXNse01PGOPLjEntlavBY44cH68GLTAYzmO3Q1lr.",
                             Phone = "+38761100016",
-                            ProfileImageUrl = "/images/avatars/16.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=16",
                             Username = "staff6"
                         },
                         new
@@ -2194,7 +2197,7 @@ namespace CutCal.Services.Database.Migrations
                             LastName = "Kovac",
                             PasswordHash = "$2a$12$enAQ2S4KvMzecXNse01PGOPLjEntlavBY44cH68GLTAYzmO3Q1lr.",
                             Phone = "+38761100017",
-                            ProfileImageUrl = "/images/avatars/17.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=17",
                             Username = "staff7"
                         },
                         new
@@ -2207,7 +2210,7 @@ namespace CutCal.Services.Database.Migrations
                             LastName = "Halilovic",
                             PasswordHash = "$2a$12$enAQ2S4KvMzecXNse01PGOPLjEntlavBY44cH68GLTAYzmO3Q1lr.",
                             Phone = "+38761100018",
-                            ProfileImageUrl = "/images/avatars/18.jpg",
+                            ProfileImageUrl = "https://i.pravatar.cc/150?img=18",
                             Username = "staff8"
                         });
                 });

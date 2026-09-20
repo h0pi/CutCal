@@ -35,6 +35,12 @@ class SalonProvider extends BaseProvider<SalonModel> {
     final data = validateResponse(response) as List;
     return data.map((e) => SalonGalleryModel.fromJson(e)).toList();
   }
+
+  Future<void> logView(int salonId) async {
+    final uri = Uri.parse('${AuthProvider.baseUrl}Salons/$salonId/View');
+    final response = await http.post(uri, headers: createHeaders());
+    validateResponse(response, allowEmpty: true);
+  }
 }
 
 class SalonServiceProvider extends BaseProvider<SalonServiceModel> {
