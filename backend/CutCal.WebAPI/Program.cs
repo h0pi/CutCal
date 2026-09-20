@@ -29,6 +29,7 @@ for (var i = 0; i < 5 && envDir is not null; i++)
 }
 
 const int StaticFileCacheSeconds = 60 * 60 * 24 * 7;
+const int GeocodingTimeoutSeconds = 10;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -70,7 +71,18 @@ builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IRecommendationService, RecommendationService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IFavoriteService, FavoriteService>();
+builder.Services.AddScoped<IGeocodingService, GeocodingService>();
 builder.Services.AddSingleton<IRabbitMqPublisher, RabbitMqPublisher>();
+
+// Geocoding (OpenStreetMap Nominatim): address and user agent come from configuration (.env).
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient(GeocodingService.HttpClientName, client =>
+{
+    var baseUrl = builder.Configuration["Geocoding:BaseUrl"];
+    if (!string.IsNullOrWhiteSpace(baseUrl)) client.BaseAddress = new Uri(baseUrl);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd(builder.Configuration["Geocoding:UserAgent"] ?? "CutCal");
+    client.Timeout = TimeSpan.FromSeconds(GeocodingTimeoutSeconds);
+});
 
 // 7. FluentValidation validators (Scoped)
 builder.Services.AddValidatorsFromAssemblyContaining<CutCal.Services.Validators.RegisterRequestValidator>(ServiceLifetime.Scoped);

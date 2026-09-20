@@ -193,7 +193,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                       Expanded(
                         child: _statChip(
                           'DISTANCE',
-                          widget.initialDistanceKm != null ? '${widget.initialDistanceKm!.toStringAsFixed(1)} mi' : '—',
+                          widget.initialDistanceKm != null ? '${widget.initialDistanceKm!.toStringAsFixed(1)} km' : '—',
                         ),
                       ),
                     ],

@@ -244,3 +244,18 @@ class UserProvider extends BaseProvider<UserModel> {
     validateResponse(response, allowEmpty: true);
   }
 }
+
+class GeocodingProvider extends BaseProvider<GeocodeResultModel> {
+  @override
+  String getEndpoint() => 'Geocoding';
+
+  @override
+  GeocodeResultModel fromJson(json) => GeocodeResultModel.fromJson(json);
+
+  Future<List<GeocodeResultModel>> search(String query) async {
+    final uri = Uri.parse('${AuthProvider.baseUrl}Geocoding/Search${getQueryString({'query': query})}');
+    final response = await http.get(uri, headers: createHeaders());
+    final data = validateResponse(response) as List;
+    return data.map((e) => GeocodeResultModel.fromJson(e)).toList();
+  }
+}

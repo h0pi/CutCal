@@ -5,6 +5,7 @@ using CutCal.Model.SearchObjects;
 using CutCal.Services.Auth;
 using CutCal.Services.Base;
 using CutCal.Services.Database;
+using System.Linq.Expressions;
 using Mapster;
 using Microsoft.EntityFrameworkCore;
 
@@ -23,6 +24,7 @@ public interface ISalonService : IBaseCRUDService<SalonResponse, SalonSearchObje
 public class SalonManagementService : BaseCRUDService<Salon, SalonResponse, SalonSearchObject, SalonInsertRequest, SalonUpdateRequest>, ISalonService
 {
     private const int ViewDedupeMinutes = 10;
+    private const double EarthRadiusKm = 6371.0;
 
     private readonly IAuthenticatedUserAccessor _userAccessor;
 
@@ -40,11 +42,6 @@ public class SalonManagementService : BaseCRUDService<Salon, SalonResponse, Salo
             foreach (var salon in result.Items)
             {
                 salon.DistanceKm = Math.Round(DistanceKm(search.Lat.Value, search.Lng.Value, salon.Latitude, salon.Longitude), 2);
-            }
-
-            if (search.RadiusKm.HasValue)
-            {
-                result.Items = result.Items.Where(x => x.DistanceKm <= search.RadiusKm.Value).ToList();
             }
         }
 
@@ -94,7 +91,54 @@ public class SalonManagementService : BaseCRUDService<Salon, SalonResponse, Salo
             // Public/customer browsing only ever sees approved salons by default.
             query = query.Where(x => x.IsApproved);
         }
-        return query;
+        if (search.MinRating.HasValue)
+        {
+            query = query.Where(x => x.AvgRating >= search.MinRating.Value);
+        }
+        if (search.OpenNow == true)
+        {
+            var now = search.NowLocal ?? DateTime.UtcNow;
+            var day = (int)now.DayOfWeek;
+            var time = TimeOnly.FromDateTime(now);
+            query = query.Where(x => x.WorkingHours.Any(w => w.DayOfWeek == day && !w.IsClosed && w.OpenTime <= time && w.CloseTime > time));
+        }
+
+        var hasLocation = search.Lat.HasValue && search.Lng.HasValue;
+        if (hasLocation && search.RadiusKm.HasValue)
+        {
+            var distance = DistanceExpression(search.Lat!.Value, search.Lng!.Value);
+            var withinRadius = Expression.Lambda<Func<Salon, bool>>(
+                Expression.LessThanOrEqual(distance.Body, Expression.Constant(search.RadiusKm.Value)), distance.Parameters);
+            query = query.Where(withinRadius);
+        }
+
+        return ApplySorting(query, search, hasLocation);
+    }
+
+    private static IQueryable<Salon> ApplySorting(IQueryable<Salon> query, SalonSearchObject search, bool hasLocation)
+    {
+        // Without a location "nearest" is meaningless, so it falls back to rating; Id keeps paging stable.
+        var sortBy = search.SortBy ?? (hasLocation ? SalonSortBy.Nearest : SalonSortBy.TopRated);
+        if (sortBy == SalonSortBy.Nearest && hasLocation)
+        {
+            return query.OrderBy(DistanceExpression(search.Lat!.Value, search.Lng!.Value)).ThenBy(x => x.Id);
+        }
+        if (sortBy == SalonSortBy.PriceLow)
+        {
+            return query.OrderBy(x => x.Services.Where(s => s.IsActive).Min(s => (decimal?)s.Price)).ThenBy(x => x.Id);
+        }
+        return query.OrderByDescending(x => x.AvgRating).ThenBy(x => x.Id);
+    }
+
+    /// <summary>Haversine distance in km, written as an expression so the database can filter and sort by it.</summary>
+    private static Expression<Func<Salon, double>> DistanceExpression(double lat, double lng)
+    {
+        var lat1 = lat * Math.PI / 180;
+        var lng1 = lng * Math.PI / 180;
+        return x => 2 * EarthRadiusKm * Math.Asin(Math.Sqrt(
+            Math.Sin((x.Latitude * Math.PI / 180 - lat1) / 2) * Math.Sin((x.Latitude * Math.PI / 180 - lat1) / 2)
+            + Math.Cos(lat1) * Math.Cos(x.Latitude * Math.PI / 180)
+              * Math.Sin((x.Longitude * Math.PI / 180 - lng1) / 2) * Math.Sin((x.Longitude * Math.PI / 180 - lng1) / 2)));
     }
 
     public async Task<SalonResponse> ApproveAsync(int id)
@@ -225,14 +269,13 @@ public class SalonManagementService : BaseCRUDService<Salon, SalonResponse, Salo
 
     public static double DistanceKm(double lat1, double lon1, double lat2, double lon2)
     {
-        var earthRadiusKm = 6371.0;
         var dLat = ToRad(lat2 - lat1);
         var dLon = ToRad(lon2 - lon1);
         var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
                 Math.Cos(ToRad(lat1)) * Math.Cos(ToRad(lat2)) *
                 Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
         var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
-        return earthRadiusKm * c;
+        return EarthRadiusKm * c;
     }
 
     private static double ToRad(double deg) => deg * Math.PI / 180.0;

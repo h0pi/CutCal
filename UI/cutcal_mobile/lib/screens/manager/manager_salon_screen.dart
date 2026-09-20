@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -9,6 +10,7 @@ import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/utils_widgets.dart';
 import '../auth/login_screen.dart';
+import 'location_picker_screen.dart';
 import 'manager_reviews_screen.dart';
 import '../../utils/image_url.dart';
 
@@ -26,6 +28,9 @@ class _ManagerSalonScreenState extends State<ManagerSalonScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
   XFile? _pickedCover;
+  double? _latitude;
+  double? _longitude;
+  bool _locationChanged = false;
 
   final _nameController = TextEditingController();
   final _bioController = TextEditingController();
@@ -53,6 +58,9 @@ class _ManagerSalonScreenState extends State<ManagerSalonScreen> {
         _bioController.text = salon.description ?? '';
         _addressController.text = salon.address;
         _phoneController.text = salon.phone ?? '';
+        _latitude = salon.latitude;
+        _longitude = salon.longitude;
+        _locationChanged = false;
         if (salon.workingHours.isNotEmpty) {
           for (final wh in salon.workingHours) {
             if (wh.dayOfWeek >= 0 && wh.dayOfWeek < 7) _hours[wh.dayOfWeek] = wh;
@@ -60,6 +68,25 @@ class _ManagerSalonScreenState extends State<ManagerSalonScreen> {
         }
       }
       _isLoading = false;
+    });
+  }
+
+  Future<void> _pickLocation() async {
+    final salon = _salon;
+    if (salon == null) return;
+    final picked = await Navigator.of(context).push<LatLng>(
+      MaterialPageRoute(
+        builder: (_) => LocationPickerScreen(
+          initial: LatLng(_latitude ?? salon.latitude, _longitude ?? salon.longitude),
+          initialQuery: '${_addressController.text.trim()}, ${salon.cityName ?? ''}'.trim().replaceAll(RegExp(r',\s*$'), ''),
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _latitude = picked.latitude;
+      _longitude = picked.longitude;
+      _locationChanged = true;
     });
   }
 
@@ -162,8 +189,8 @@ class _ManagerSalonScreenState extends State<ManagerSalonScreen> {
         'description': _bioController.text.trim(),
         'address': _addressController.text.trim(),
         'cityId': _salon!.cityId,
-        'latitude': _salon!.latitude,
-        'longitude': _salon!.longitude,
+        'latitude': _latitude ?? _salon!.latitude,
+        'longitude': _longitude ?? _salon!.longitude,
         'phone': _phoneController.text.trim(),
         'email': _salon!.email,
         'profileImageUrl': _salon!.profileImageUrl,
@@ -231,6 +258,12 @@ class _ManagerSalonScreenState extends State<ManagerSalonScreen> {
                     TextField(controller: _bioController, decoration: const InputDecoration(labelText: 'Bio'), maxLines: 3),
                     const SizedBox(height: 12),
                     TextField(controller: _addressController, decoration: const InputDecoration(labelText: 'Address')),
+                    const SizedBox(height: 12),
+                    _SettingsLikeTile(
+                      icon: Icons.place_outlined,
+                      label: _locationChanged ? 'Location updated on map (save to apply)' : 'Set location on map',
+                      onTap: _pickLocation,
+                    ),
                     const SizedBox(height: 12),
                     TextField(controller: _phoneController, decoration: const InputDecoration(labelText: 'Phone')),
                     const SizedBox(height: 24),

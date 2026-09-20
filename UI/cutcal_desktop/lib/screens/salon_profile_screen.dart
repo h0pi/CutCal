@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../providers/entity_providers.dart';
+import '../utils/api_client_exception.dart';
 import '../utils/utils_widgets.dart';
 import '../utils/image_url.dart';
 
@@ -22,6 +23,9 @@ class _SalonProfileScreenState extends State<SalonProfileScreen> {
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _addressController = TextEditingController();
+  double? _latitude;
+  double? _longitude;
+  String? _locationLabel;
 
   @override
   void initState() {
@@ -44,23 +48,109 @@ class _SalonProfileScreenState extends State<SalonProfileScreen> {
       _phoneController.text = salon.phone ?? '';
       _emailController.text = salon.email ?? '';
       _addressController.text = salon.address;
+      _latitude = salon.latitude;
+      _longitude = salon.longitude;
+      _locationLabel = null;
       _gallery = gallery;
     });
   }
 
   Future<void> _pickCoordinates() async {
-    // TODO: replace this placeholder with a real Google Maps picker modal
-    // (google_maps_flutter) that lets the manager drop a pin and returns lat/lng,
-    // or call a geocoding endpoint for the typed address. Never expose raw
-    // lat/lng textboxes to the end user.
-    await showDialog(
+    final salon = _selectedSalon;
+    if (salon == null) return;
+
+    final queryController = TextEditingController(text: '${_addressController.text.trim()}, ${salon.cityName ?? ''}'.replaceAll(RegExp(r',\s*$'), ''));
+    List<GeocodeResultModel> results = [];
+    GeocodeResultModel? chosen;
+    String? errorText;
+    var isSearching = false;
+
+    Future<void> runSearch(StateSetter setDialogState) async {
+      setDialogState(() {
+        isSearching = true;
+        errorText = null;
+      });
+      try {
+        final found = await context.read<GeocodingProvider>().search(queryController.text.trim());
+        setDialogState(() {
+          results = found;
+          chosen = found.firstOrNull;
+          if (found.isEmpty) errorText = 'No matches found. Try adding the city.';
+        });
+      } on ApiClientException catch (e) {
+        setDialogState(() => errorText = e.message);
+      } finally {
+        setDialogState(() => isSearching = false);
+      }
+    }
+
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Set salon location'),
-        content: const Text('Map picker coming soon. For now, coordinates are derived from the address on save.'),
-        actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Close'))],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Row(
+            children: [
+              const Expanded(child: Text('Find salon location')),
+              IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop(false)),
+            ],
+          ),
+          content: SizedBox(
+            width: 480,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: queryController,
+                  decoration: InputDecoration(
+                    labelText: 'Street and city',
+                    hintText: 'Ferhadija 1, Sarajevo',
+                    errorText: errorText,
+                    suffixIcon: isSearching
+                        ? const Padding(padding: EdgeInsets.all(12), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)))
+                        : IconButton(icon: const Icon(Icons.search), onPressed: () => runSearch(setDialogState)),
+                  ),
+                  onSubmitted: (_) => runSearch(setDialogState),
+                ),
+                const SizedBox(height: 8),
+                if (results.isNotEmpty)
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: RadioGroup<GeocodeResultModel>(
+                        groupValue: chosen,
+                        onChanged: (v) => setDialogState(() => chosen = v),
+                        child: Column(
+                          children: results
+                              .map((r) => RadioListTile<GeocodeResultModel>(
+                                    value: r,
+                                    dense: true,
+                                    title: Text(r.displayName, maxLines: 2, overflow: TextOverflow.ellipsis),
+                                  ))
+                              .toList(),
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  const Text('Type an address and press Enter to search.', style: TextStyle(color: Colors.grey)),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+            FilledButton(onPressed: chosen == null ? null : () => Navigator.of(context).pop(true), child: const Text('Use this location')),
+          ],
+        ),
       ),
     );
+
+    final picked = chosen;
+    if (confirmed != true || picked == null || !mounted) return;
+    setState(() {
+      _latitude = picked.latitude;
+      _longitude = picked.longitude;
+      _locationLabel = picked.displayName;
+    });
   }
 
   Future<void> _save() async {
@@ -72,8 +162,8 @@ class _SalonProfileScreenState extends State<SalonProfileScreen> {
       'description': _descriptionController.text,
       'address': _addressController.text,
       'cityId': salon.cityId,
-      'latitude': salon.latitude,
-      'longitude': salon.longitude,
+      'latitude': _latitude ?? salon.latitude,
+      'longitude': _longitude ?? salon.longitude,
       'phone': _phoneController.text,
       'email': _emailController.text,
       'profileImageUrl': salon.profileImageUrl,
@@ -149,9 +239,14 @@ class _SalonProfileScreenState extends State<SalonProfileScreen> {
                 child: TextField(controller: _addressController, decoration: const InputDecoration(labelText: 'Address', border: OutlineInputBorder())),
               ),
               const SizedBox(width: 8),
-              OutlinedButton.icon(icon: const Icon(Icons.map), label: const Text('Set on map'), onPressed: _pickCoordinates),
+              OutlinedButton.icon(icon: const Icon(Icons.place_outlined), label: const Text('Find on map'), onPressed: _pickCoordinates),
             ],
           ),
+          if (_locationLabel != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text('New location: $_locationLabel (save to apply)', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+            ),
           const SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,

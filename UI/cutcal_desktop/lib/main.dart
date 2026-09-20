@@ -28,6 +28,7 @@ class CutCalDesktopApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
         ChangeNotifierProvider(create: (_) => UserProvider()),
         Provider(create: (_) => ReportProvider()),
+        Provider(create: (_) => GeocodingProvider()),
       ],
       child: MaterialApp(
         title: 'CutCal Admin',

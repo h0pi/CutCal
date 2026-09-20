@@ -440,3 +440,17 @@ class RecommendationModel {
         reason: json['reason'] ?? '',
       );
 }
+
+class GeocodeResultModel {
+  final String displayName;
+  final double latitude;
+  final double longitude;
+
+  GeocodeResultModel({required this.displayName, required this.latitude, required this.longitude});
+
+  factory GeocodeResultModel.fromJson(Map<String, dynamic> json) => GeocodeResultModel(
+        displayName: json['displayName'] ?? '',
+        latitude: (json['latitude'] ?? 0).toDouble(),
+        longitude: (json['longitude'] ?? 0).toDouble(),
+      );
+}

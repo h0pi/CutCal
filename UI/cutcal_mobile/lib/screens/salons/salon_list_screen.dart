@@ -9,6 +9,7 @@ import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/utils_widgets.dart';
 import 'salon_detail_screen.dart';
+import 'salon_filter_sheet.dart';
 import '../../utils/image_url.dart';
 
 // Images are network-loaded; bounded via cacheWidth to keep decode cost low.
@@ -28,6 +29,8 @@ class _SalonListScreenState extends State<SalonListScreen> {
   int? _selectedCategoryId;
   List<SalonModel> _salons = [];
   List<RecommendationModel> _recommendations = [];
+  SalonFilters _filters = const SalonFilters();
+  int _totalCount = 0;
   int _page = 0;
   bool _isLoading = false;
   bool _hasMore = true;
@@ -74,7 +77,24 @@ class _SalonListScreenState extends State<SalonListScreen> {
     }
   }
 
-  bool get _showRecommendations => _recommendations.isNotEmpty && _selectedCategoryId == null && _searchController.text.isEmpty;
+  bool get _showRecommendations =>
+      _recommendations.isNotEmpty && _selectedCategoryId == null && _searchController.text.isEmpty && !_filters.isActive;
+
+  String get _listTitle {
+    if (_selectedCategoryId != null || _searchController.text.isNotEmpty) return 'Results';
+    return switch (_filters.effectiveSort(hasLocation: _lat != null && _lng != null)) {
+      SalonSortBy.nearest => 'Nearest to you',
+      SalonSortBy.priceLow => 'Lowest price first',
+      _ => 'Top rated',
+    };
+  }
+
+  Future<void> _openFilters() async {
+    final result = await showSalonFilterSheet(context, _filters, hasLocation: _lat != null && _lng != null);
+    if (result == null || !mounted) return;
+    setState(() => _filters = result);
+    _loadSalons(reset: true);
+  }
 
   Future<void> _loadCategories() async {
     final result = await context.read<SalonCategoryProvider>().get();
@@ -99,10 +119,12 @@ class _SalonListScreenState extends State<SalonListScreen> {
         'categoryId': _selectedCategoryId,
         'lat': _lat,
         'lng': _lng,
+        ..._filters.toQuery(),
       });
       if (!mounted) return;
       setState(() {
         _salons.addAll(result.items);
+        _totalCount = result.totalCount;
         _hasMore = _salons.length < result.totalCount;
         _page++;
       });
@@ -154,10 +176,10 @@ class _SalonListScreenState extends State<SalonListScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    _selectedCategoryId == null ? 'Top rated nearby' : 'Results',
+                    _listTitle,
                     style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                   ),
-                  Text('${_salons.length} nearby', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 13)),
+                  Text('$_totalCount ${_totalCount == 1 ? 'salon' : 'salons'}', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 13)),
                 ],
               ),
             ),
@@ -240,8 +262,19 @@ class _SalonListScreenState extends State<SalonListScreen> {
                 borderRadius: BorderRadius.circular(24),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(24),
-                  onTap: () {},
-                  child: const SizedBox(width: 48, height: 48, child: Icon(Icons.tune, color: Colors.white)),
+                  onTap: _openFilters,
+                  child: SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: Center(
+                      child: Badge(
+                        isLabelVisible: _filters.isActive,
+                        smallSize: 10,
+                        backgroundColor: AppColors.starColor,
+                        child: const Icon(Icons.tune, color: Colors.white),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -422,7 +455,7 @@ class _SalonCard extends StatelessWidget {
     final closeLabel = _closeTimeLabel;
 
     final subtitleParts = <String>[];
-    if (salon.distanceKm != null) subtitleParts.add('${salon.distanceKm!.toStringAsFixed(1)} mi');
+    if (salon.distanceKm != null) subtitleParts.add('${salon.distanceKm!.toStringAsFixed(1)} km');
     if (salon.cityName != null) subtitleParts.add(salon.cityName!);
     if (isOpen == true && closeLabel != null) {
       subtitleParts.add('Open till $closeLabel');

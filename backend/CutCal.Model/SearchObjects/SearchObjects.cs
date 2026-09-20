@@ -10,6 +10,13 @@ public class UserSearchObject : BaseSearchObject
     public bool? IsActive { get; set; }
 }
 
+public static class SalonSortBy
+{
+    public const string Nearest = "Nearest";
+    public const string TopRated = "TopRated";
+    public const string PriceLow = "PriceLow";
+}
+
 public class SalonSearchObject : BaseSearchObject
 {
     public string? Name { get; set; }
@@ -18,6 +25,10 @@ public class SalonSearchObject : BaseSearchObject
     public double? Lat { get; set; }
     public double? Lng { get; set; }
     public double? RadiusKm { get; set; }
+    public double? MinRating { get; set; }
+    public bool? OpenNow { get; set; }
+    /// <summary>The client's current local time; salons store wall-clock opening hours.</summary>
+    public DateTime? NowLocal { get; set; }
     public bool? IsApproved { get; set; }
 }
 

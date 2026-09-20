@@ -234,3 +234,10 @@ public class AvailabilitySlotResponse
     public DateTime StartsAt { get; set; }
     public bool IsAvailable { get; set; }
 }
+
+public class GeocodeResultResponse
+{
+    public string DisplayName { get; set; } = null!;
+    public double Latitude { get; set; }
+    public double Longitude { get; set; }
+}

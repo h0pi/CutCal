@@ -14,6 +14,9 @@ import '../../utils/image_url.dart';
 // or unavailable, so the map still opens somewhere sensible.
 const _fallbackCenter = LatLng(43.8563, 18.4131);
 
+// Salons rated at or above this get an amber marker and match the "Top rated" filter.
+const _topRatedMin = 4.5;
+
 class SalonMapScreen extends StatefulWidget {
   const SalonMapScreen({super.key});
 
@@ -28,6 +31,9 @@ class _SalonMapScreenState extends State<SalonMapScreen> {
   GoogleMapController? _mapController;
   LatLng _initialCenter = _fallbackCenter;
   SalonModel? _selectedSalon;
+  LatLng? _userLocation;
+  bool _topRatedOnly = false;
+  bool _openNowOnly = false;
 
   @override
   void initState() {
@@ -50,8 +56,12 @@ class _SalonMapScreenState extends State<SalonMapScreen> {
 
       final position = await Geolocator.getCurrentPosition();
       if (!mounted) return;
-      setState(() => _initialCenter = LatLng(position.latitude, position.longitude));
+      setState(() {
+        _userLocation = LatLng(position.latitude, position.longitude);
+        _initialCenter = _userLocation!;
+      });
       _mapController?.animateCamera(CameraUpdate.newLatLng(_initialCenter));
+      _load(name: _searchController.text.isEmpty ? null : _searchController.text);
     } catch (_) {
       // Keep the fallback center; the map is still usable without live location.
     }
@@ -72,6 +82,11 @@ class _SalonMapScreenState extends State<SalonMapScreen> {
     final salons = await context.read<SalonProvider>().get(filter: {
       'pageSize': 100,
       'name': name,
+      'lat': _userLocation?.latitude,
+      'lng': _userLocation?.longitude,
+      'minRating': _topRatedOnly ? _topRatedMin : null,
+      'openNow': _openNowOnly ? true : null,
+      'nowLocal': _openNowOnly ? DateTime.now().toIso8601String() : null,
     });
     if (!mounted) return;
     setState(() {
@@ -80,11 +95,26 @@ class _SalonMapScreenState extends State<SalonMapScreen> {
     });
   }
 
+  Widget _filterChip(String label, bool selected, void Function(bool) assign) {
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      showCheckmark: false,
+      backgroundColor: Colors.white,
+      selectedColor: AppColors.primary,
+      labelStyle: TextStyle(color: selected ? Colors.white : AppColors.textPrimary, fontWeight: FontWeight.w600),
+      onSelected: (value) {
+        setState(() => assign(value));
+        _load(name: _searchController.text.isEmpty ? null : _searchController.text);
+      },
+    );
+  }
+
   Set<Marker> get _markers => _salons
       .map((salon) => Marker(
             markerId: MarkerId('salon-${salon.id}'),
             position: LatLng(salon.latitude, salon.longitude),
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
+            icon: BitmapDescriptor.defaultMarkerWithHue(salon.avgRating >= _topRatedMin ? BitmapDescriptor.hueOrange : BitmapDescriptor.hueViolet),
             onTap: () => setState(() => _selectedSalon = salon),
           ))
       .toSet();
@@ -106,28 +136,43 @@ class _SalonMapScreenState extends State<SalonMapScreen> {
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Material(
-                      elevation: 3,
-                      borderRadius: BorderRadius.circular(28),
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: const InputDecoration(hintText: 'Search this area', prefixIcon: Icon(Icons.search)),
-                        onSubmitted: (v) => _load(name: v.isEmpty ? null : v),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Material(
+                          elevation: 3,
+                          borderRadius: BorderRadius.circular(28),
+                          child: TextField(
+                            controller: _searchController,
+                            decoration: const InputDecoration(hintText: 'Search this area', prefixIcon: Icon(Icons.search)),
+                            onSubmitted: (v) => _load(name: v.isEmpty ? null : v),
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 10),
+                      Material(
+                        elevation: 3,
+                        shape: const CircleBorder(),
+                        color: AppColors.primary,
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: _recenter,
+                          child: const SizedBox(width: 48, height: 48, child: Icon(Icons.my_location, color: Colors.white)),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 10),
-                  Material(
-                    elevation: 3,
-                    shape: const CircleBorder(),
-                    color: AppColors.primary,
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: _recenter,
-                      child: const SizedBox(width: 48, height: 48, child: Icon(Icons.my_location, color: Colors.white)),
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Wrap(
+                      spacing: 8,
+                      children: [
+                        _filterChip('Top rated', _topRatedOnly, (v) => _topRatedOnly = v),
+                        _filterChip('Open now', _openNowOnly, (v) => _openNowOnly = v),
+                      ],
                     ),
                   ),
                 ],
@@ -192,7 +237,7 @@ class _SalonPreviewCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(salon.address, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12), overflow: TextOverflow.ellipsis),
                       if (salon.distanceKm != null)
-                        Text('${salon.distanceKm!.toStringAsFixed(1)} mi away', style: const TextStyle(color: AppColors.primaryDark, fontSize: 12, fontWeight: FontWeight.w600)),
+                        Text('${salon.distanceKm!.toStringAsFixed(1)} km away', style: const TextStyle(color: AppColors.primaryDark, fontSize: 12, fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ),
