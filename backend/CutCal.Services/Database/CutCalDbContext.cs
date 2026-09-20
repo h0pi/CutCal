@@ -27,6 +27,7 @@ public class CutCalDbContext : DbContext
     public DbSet<Favorite> Favorites => Set<Favorite>();
     public DbSet<UserSearchHistory> UserSearchHistories => Set<UserSearchHistory>();
     public DbSet<SalonView> SalonViews => Set<SalonView>();
+    public DbSet<RevokedToken> RevokedTokens => Set<RevokedToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

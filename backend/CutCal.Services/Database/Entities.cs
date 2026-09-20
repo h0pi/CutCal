@@ -44,6 +44,13 @@ public class RefreshToken
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
+/// <summary>Access tokens invalidated by logout; kept only until they would have expired anyway.</summary>
+public class RevokedToken
+{
+    public string Jti { get; set; } = null!;
+    public DateTime ExpiresAt { get; set; }
+}
+
 public class SalonCategory
 {
     public int Id { get; set; }

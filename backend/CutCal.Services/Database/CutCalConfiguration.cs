@@ -140,6 +140,18 @@ public class FavoriteConfiguration : IEntityTypeConfiguration<Favorite>
     }
 }
 
+public class RevokedTokenConfiguration : IEntityTypeConfiguration<RevokedToken>
+{
+    private const int JtiMaxLength = 64;
+
+    public void Configure(EntityTypeBuilder<RevokedToken> builder)
+    {
+        builder.HasKey(x => x.Jti);
+        builder.Property(x => x.Jti).HasMaxLength(JtiMaxLength);
+        builder.HasIndex(x => x.ExpiresAt);
+    }
+}
+
 public class SalonViewConfiguration : IEntityTypeConfiguration<SalonView>
 {
     public void Configure(EntityTypeBuilder<SalonView> builder)

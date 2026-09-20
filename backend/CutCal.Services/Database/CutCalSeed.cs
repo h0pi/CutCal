@@ -4,11 +4,11 @@ namespace CutCal.Services.Database;
 
 public static class CutCalSeed
 {
-    // Precomputed BCrypt hash of "test123". Must stay a fixed literal (not a live
+    // Precomputed BCrypt hash of "test" (the password every seeded account uses). Must stay a fixed literal (not a live
     // CryptoService.HashPassword call): BCrypt embeds a fresh random salt on every
     // call, so re-hashing here would produce a different string on every build and
     // EF would perpetually think the seed data changed (PendingModelChangesWarning).
-    private const string SeedPasswordHash = "$2a$12$enAQ2S4KvMzecXNse01PGOPLjEntlavBY44cH68GLTAYzmO3Q1lr.";
+    private const string SeedPasswordHash = "$2a$12$ut/rfr3dCMbxCMFkrTvqx.ZrocbPowx8.j7Db82QinlgaSQsF1yBi";
 
     public static void Seed(ModelBuilder modelBuilder)
     {
@@ -69,6 +69,8 @@ public static class CutCalSeed
                 ProfileImageUrl = $"/images/avatars/{11 + i}.jpg"
             });
         }
+        users.Add(new User { Id = 19, Username = "desktop", FirstName = "Desktop", LastName = "Admin", Email = "desktop@cutcal.com", Phone = "+38761000019", PasswordHash = passwordHash, IsActive = true, CreatedAt = seedDate, ProfileImageUrl = "/images/avatars/19.jpg" });
+        users.Add(new User { Id = 20, Username = "mobile", FirstName = "Mobile", LastName = "Customer", Email = "mobile@cutcal.com", Phone = "+38761000020", PasswordHash = passwordHash, IsActive = true, CreatedAt = seedDate, ProfileImageUrl = "/images/avatars/20.jpg" });
         modelBuilder.Entity<User>().HasData(users);
 
         var userRoles = new List<UserRole>
@@ -88,6 +90,8 @@ public static class CutCalSeed
         {
             userRoles.Add(new UserRole { Id = 11 + i, UserId = 11 + i, RoleId = 2 });
         }
+        userRoles.Add(new UserRole { Id = 19, UserId = 19, RoleId = 4 });
+        userRoles.Add(new UserRole { Id = 20, UserId = 20, RoleId = 1 });
         modelBuilder.Entity<UserRole>().HasData(userRoles);
 
         var salonImageUrls = new[]

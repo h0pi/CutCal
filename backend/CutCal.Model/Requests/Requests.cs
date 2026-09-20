@@ -11,6 +11,11 @@ public class LoginWithRefreshTokenRequest
     public string RefreshToken { get; set; } = null!;
 }
 
+public class LogoutRequest
+{
+    public string? RefreshToken { get; set; }
+}
+
 public class RegisterRequest
 {
     public string Username { get; set; } = null!;

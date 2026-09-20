@@ -19,7 +19,7 @@ public interface IAccessManager
     Task<LoginResponse> LoginAsync(LoginRequest request);
     Task<LoginResponse> LoginWithRefreshTokenAsync(LoginWithRefreshTokenRequest request);
     Task<UserResponse> RegisterAsync(RegisterRequest request);
-    Task LogoutAsync(int userId, string? refreshToken);
+    Task LogoutAsync(int userId, string? refreshToken, string? accessTokenId, DateTime? accessTokenExpiresAt);
 }
 
 public class AccessManager : IAccessManager
@@ -114,19 +114,27 @@ public class AccessManager : IAccessManager
         return user.Adapt<UserResponse>();
     }
 
-    public async Task LogoutAsync(int userId, string? refreshToken)
+    public async Task LogoutAsync(int userId, string? refreshToken, string? accessTokenId, DateTime? accessTokenExpiresAt)
     {
-        if (string.IsNullOrEmpty(refreshToken))
+        // One SaveChanges: the access token is blacklisted and the refresh token deleted together or not at all.
+        var now = DateTime.UtcNow;
+        _context.RevokedTokens.RemoveRange(await _context.RevokedTokens.Where(x => x.ExpiresAt < now).ToListAsync());
+
+        if (!string.IsNullOrEmpty(accessTokenId) && !await _context.RevokedTokens.AnyAsync(x => x.Jti == accessTokenId))
         {
-            return;
+            _context.RevokedTokens.Add(new RevokedToken { Jti = accessTokenId, ExpiresAt = accessTokenExpiresAt ?? now.AddMinutes(_durationInMinutes) });
         }
 
-        var token = await _context.RefreshTokens.FirstOrDefaultAsync(x => x.UserId == userId && x.Token == refreshToken);
-        if (token is not null)
+        if (!string.IsNullOrEmpty(refreshToken))
         {
-            _context.RefreshTokens.Remove(token);
-            await _context.SaveChangesAsync();
+            var token = await _context.RefreshTokens.FirstOrDefaultAsync(x => x.UserId == userId && x.Token == refreshToken);
+            if (token is not null)
+            {
+                _context.RefreshTokens.Remove(token);
+            }
         }
+
+        await _context.SaveChangesAsync();
     }
 
     private async Task<LoginResponse> BuildLoginResponseAsync(User user)
@@ -136,6 +144,7 @@ public class AccessManager : IAccessManager
 
         var claims = new List<Claim>
         {
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new("Id", user.Id.ToString()),
             new("FirstName", user.FirstName),
             new("LastName", user.LastName),

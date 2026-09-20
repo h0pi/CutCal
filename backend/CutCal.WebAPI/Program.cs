@@ -57,6 +57,7 @@ MapsterConfig.Configure();
 // 6. Application services (Scoped)
 builder.Services.AddScoped<ICryptoService, CryptoService>();
 builder.Services.AddScoped<IAccessManager, AccessManager>();
+builder.Services.AddScoped<ITokenRevocationService, TokenRevocationService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ISalonService, SalonManagementService>();
 builder.Services.AddScoped<ISalonCategoryService, SalonCategoryService>();
@@ -105,6 +106,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = jwtAudience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
         };
+        options.Events = new JwtBearerEvents { OnTokenValidated = JwtValidation.OnTokenValidated };
     });
 
 // 9. Authorization

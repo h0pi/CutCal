@@ -52,7 +52,7 @@ class AuthProvider with ChangeNotifier {
     );
 
     if (response.statusCode != 200) {
-      logout();
+      _clearSession();
       return false;
     }
 
@@ -68,7 +68,25 @@ class AuthProvider with ChangeNotifier {
     accessTokenDecoded = JwtDecoder.decode(accessToken!);
   }
 
-  void logout() {
+  /// Ends the session locally right away, then tells the server to invalidate the tokens.
+  Future<void> logout() async {
+    final access = accessToken;
+    final refresh = refreshToken;
+    _clearSession();
+    if (access == null) return;
+
+    try {
+      await http.post(
+        Uri.parse('${baseUrl}Access/Logout'),
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $access'},
+        body: jsonEncode({'refreshToken': refresh}),
+      );
+    } on Exception catch (e) {
+      debugPrint('Server-side logout failed: $e');
+    }
+  }
+
+  void _clearSession() {
     accessToken = null;
     refreshToken = null;
     accessTokenDecoded = null;

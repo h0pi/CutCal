@@ -63,17 +63,22 @@ flutter run -d windows --dart-define=baseUrl=http://localhost:5194/
 
 ## Test credentials
 
-All seeded users use the password `test123`.
+Every seeded account uses the password `test`.
 
-| Kontekst           | Korisničko ime | Lozinka |
-|---------------------|----------------|---------|
-| Desktop (Admin)     | admin          | test123 |
-| Mobile (Customer)   | customer       | test123 |
-| Salon Manager       | manager        | test123 |
+| Kontekst | Korisničko ime | Lozinka |
+|---|---|---|
+| Desktop verzija (Admin) | `desktop` | `test` |
+| Mobilna verzija (Customer) | `mobile` | `test` |
+| Više korisničkih uloga: Admin | `admin` | `test` |
+| Više korisničkih uloga: SalonManager (Business Mode u mobilnoj) | `manager` | `test` |
+| Više korisničkih uloga: Customer | `customer` | `test` |
+| Više korisničkih uloga: Staff | `staff1` | `test` |
+
+Logging out invalidates the access token on the server (it is blacklisted until it would have expired) and deletes the refresh token, so a token copied before logout stops working.
 
 ## Notes / known deviations from the original spec
 
 - Real-time notifications use polling (`GET /Notifications` every 30s from the client) as the primary implementation. A `// TODO: SignalR` marker is left on `NotificationsController` for a future push-based upgrade.
-- The seed requires dedicated `User` accounts for `Staff` members (since `Staff.UserId` is a required FK), so in addition to the 10 accounts described in the original brief (2 Admin, 3 SalonManager, 5 Customer) there are 8 additional seeded Staff-role user accounts (`staff1`..`staff8`, password `test123`).
+- The seed requires dedicated `User` accounts for `Staff` members (since `Staff.UserId` is a required FK), so in addition to the 10 accounts described in the original brief (2 Admin, 3 SalonManager, 5 Customer) there are 8 additional seeded Staff-role user accounts (`staff1`..`staff8`, password `test`), plus the two named accounts `desktop` and `mobile`.
 - `Users/{id}/ChangePassword` lives under the Admin-only `UsersController` per spec. A logged-in Customer changing their own password would need a "my profile" style endpoint, which is not in the original controller list — flagged here as a gap for a future iteration.
 - Google Maps address→coordinate geocoding and the SignalR hub are left as explicit `// TODO`s in the Flutter apps, as called out in the spec.
