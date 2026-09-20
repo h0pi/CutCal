@@ -15,6 +15,8 @@ import '../../utils/image_url.dart';
 // Images are network-loaded; bounded via cacheWidth to keep decode cost low.
 const bool kShowSalonImages = true;
 const int _maxRecommendations = 5;
+const int _salonPageSize = 10;
+const double _loadMoreThreshold = 600;
 
 class SalonListScreen extends StatefulWidget {
   const SalonListScreen({super.key});
@@ -32,6 +34,9 @@ class _SalonListScreenState extends State<SalonListScreen> {
   SalonFilters _filters = const SalonFilters();
   int _totalCount = 0;
   int _page = 0;
+  int _loadGeneration = 0;
+  String? _loadError;
+  final _scrollController = ScrollController();
   bool _isLoading = false;
   bool _hasMore = true;
   double? _lat;
@@ -40,6 +45,7 @@ class _SalonListScreenState extends State<SalonListScreen> {
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_loadMoreIfNearBottom);
     _loadCategories();
     _determineLocation();
     _loadSalons(reset: true);
@@ -101,35 +107,66 @@ class _SalonListScreenState extends State<SalonListScreen> {
     if (mounted) setState(() => _categories = result.items);
   }
 
-  Future<void> _loadSalons({bool reset = false}) async {
-    if (_isLoading) return;
-    setState(() => _isLoading = true);
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
 
+  void _loadMoreIfNearBottom() {
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.position.extentAfter < _loadMoreThreshold) _loadSalons();
+  }
+
+  /// Loads the first page (reset) or the next one. A reset invalidates any request still in flight,
+  /// so a slow response for old filters can never overwrite the list for the new ones.
+  Future<void> _loadSalons({bool reset = false}) async {
     if (reset) {
+      _loadGeneration++;
       _page = 0;
       _salons = [];
       _hasMore = true;
+      _loadError = null;
+    } else if (_isLoading || !_hasMore) {
+      return;
     }
+
+    final generation = _loadGeneration;
+    final page = _page;
+    setState(() => _isLoading = true);
 
     try {
       final result = await context.read<SalonProvider>().get(filter: {
-        'page': _page,
-        'pageSize': 10,
+        'page': page,
+        'pageSize': _salonPageSize,
         'name': _searchController.text.isEmpty ? null : _searchController.text,
         'categoryId': _selectedCategoryId,
         'lat': _lat,
         'lng': _lng,
         ..._filters.toQuery(),
       });
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _salons.addAll(result.items);
         _totalCount = result.totalCount;
         _hasMore = _salons.length < result.totalCount;
-        _page++;
+        _page = page + 1;
       });
+      // A short first page may not be scrollable at all, so keep filling until it is.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _isLoading == false) _loadMoreIfNearBottom();
+      });
+    } on ApiClientException catch (e) {
+      // Stop paging and show the error with a retry button instead of spinning forever.
+      if (mounted && generation == _loadGeneration) {
+        setState(() {
+          _hasMore = false;
+          _loadError = e.message;
+        });
+      }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted && generation == _loadGeneration) setState(() => _isLoading = false);
     }
   }
 
@@ -151,6 +188,7 @@ class _SalonListScreenState extends State<SalonListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: CustomScrollView(
+        controller: _scrollController,
         slivers: [
           SliverToBoxAdapter(child: _buildHeader()),
           SliverPadding(
@@ -185,18 +223,32 @@ class _SalonListScreenState extends State<SalonListScreen> {
             ),
           ),
           if (_salons.isEmpty && !_isLoading)
-            const SliverFillRemaining(
+            SliverFillRemaining(
               hasScrollBody: false,
-              child: Center(child: Text('No salons found.', style: TextStyle(color: AppColors.textSecondary))),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_loadError ?? 'No salons found.', textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary)),
+                    if (_loadError != null) ...[
+                      const SizedBox(height: 12),
+                      OutlinedButton(
+                        style: OutlinedButton.styleFrom(minimumSize: const Size(120, 44)),
+                        onPressed: () => _loadSalons(reset: true),
+                        child: const Text('Try again'),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             )
           else
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
               sliver: SliverList.builder(
-                itemCount: _salons.length + (_hasMore ? 1 : 0),
+                itemCount: _salons.length + (_isLoading && _hasMore ? 1 : 0),
                 itemBuilder: (context, index) {
                   if (index == _salons.length) {
-                    _loadSalons();
                     return const Padding(padding: EdgeInsets.all(16), child: LoadingIndicator());
                   }
                   final salon = _salons[index];

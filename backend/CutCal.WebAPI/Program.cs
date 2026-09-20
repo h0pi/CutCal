@@ -163,6 +163,7 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<CutCalDbContext>();
     await db.Database.MigrateAsync();
+    await DemoDataSeeder.EnsureUpcomingAppointmentsAsync(db, scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(nameof(DemoDataSeeder)));
 }
 
 if (app.Environment.IsDevelopment())

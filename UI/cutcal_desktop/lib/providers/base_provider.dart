@@ -9,6 +9,7 @@ import 'auth_provider.dart';
 
 abstract class BaseProvider<T> with ChangeNotifier {
   static String? baseUrl = AuthProvider.baseUrl;
+  static const _requestTimeout = Duration(seconds: 20);
 
   String getEndpoint();
 
@@ -16,36 +17,47 @@ abstract class BaseProvider<T> with ChangeNotifier {
 
   Future<PagedResult<T>> get({Map<String, dynamic>? filter}) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}${getEndpoint()}${getQueryString(filter ?? {})}');
-    final response = await http.get(uri, headers: createHeaders());
+    final response = await sendRequest(http.get(uri, headers: createHeaders()));
     final data = validateResponse(response);
     return PagedResult<T>.fromJson(data, (item) => fromJson(item));
   }
 
   Future<T> getById(int id) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}${getEndpoint()}/$id');
-    final response = await http.get(uri, headers: createHeaders());
+    final response = await sendRequest(http.get(uri, headers: createHeaders()));
     final data = validateResponse(response);
     return fromJson(data);
   }
 
   Future<T> insert(dynamic request) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}${getEndpoint()}');
-    final response = await http.post(uri, headers: createHeaders(), body: jsonEncode(request));
+    final response = await sendRequest(http.post(uri, headers: createHeaders(), body: jsonEncode(request)));
     final data = validateResponse(response);
     return fromJson(data);
   }
 
   Future<T> update(int id, dynamic request) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}${getEndpoint()}/$id');
-    final response = await http.put(uri, headers: createHeaders(), body: jsonEncode(request));
+    final response = await sendRequest(http.put(uri, headers: createHeaders(), body: jsonEncode(request)));
     final data = validateResponse(response);
     return fromJson(data);
   }
 
   Future<void> remove(int id) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}${getEndpoint()}/$id');
-    final response = await http.delete(uri, headers: createHeaders());
+    final response = await sendRequest(http.delete(uri, headers: createHeaders()));
     validateResponse(response, allowEmpty: true);
+  }
+
+  /// Runs a request with a timeout and turns network failures (server down, no connection,
+  /// timeout) into a readable [ApiClientException] instead of an unhandled error.
+  Future<http.Response> sendRequest(Future<http.Response> request) async {
+    try {
+      return await request.timeout(_requestTimeout);
+    } on Exception catch (e) {
+      debugPrint('Request failed: $e');
+      throw ApiClientException('Cannot reach the server. Please check your connection and try again.');
+    }
   }
 
   Map<String, String> createHeaders() {

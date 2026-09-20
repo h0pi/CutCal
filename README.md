@@ -79,6 +79,6 @@ Logging out invalidates the access token on the server (it is blacklisted until 
 ## Notes / known deviations from the original spec
 
 - Real-time notifications use polling (`GET /Notifications` every 30s from the client) as the primary implementation. A `// TODO: SignalR` marker is left on `NotificationsController` for a future push-based upgrade.
-- The seed requires dedicated `User` accounts for `Staff` members (since `Staff.UserId` is a required FK), so in addition to the 10 accounts described in the original brief (2 Admin, 3 SalonManager, 5 Customer) there are 8 additional seeded Staff-role user accounts (`staff1`..`staff8`, password `test`), plus the two named accounts `desktop` and `mobile`.
+- Demo data: 15 salons (3 per category, across Sarajevo, Mostar, Banja Luka, Zagreb and Belgrade) with photos, 30 staff members (`staff1`..`staff30`), 10 customers (`customer`, `customer2`..`customer10`, plus `mobile`), about 140 historic appointments with 90 reviews (salon ratings are the real average of their reviews), and every salon is topped up to three upcoming appointments each time the API starts. All seeded accounts use the password `test`.
 - `Users/{id}/ChangePassword` lives under the Admin-only `UsersController` per spec. A logged-in Customer changing their own password would need a "my profile" style endpoint, which is not in the original controller list — flagged here as a gap for a future iteration.
 - Google Maps address→coordinate geocoding and the SignalR hub are left as explicit `// TODO`s in the Flutter apps, as called out in the spec.
