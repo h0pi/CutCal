@@ -33,6 +33,7 @@ class CutCalApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => FavoriteProvider()),
         ChangeNotifierProvider(create: (_) => ReportProvider()),
+        ChangeNotifierProvider(create: (_) => AvailabilityProvider()),
       ],
       child: MaterialApp(
         title: 'CutCal',

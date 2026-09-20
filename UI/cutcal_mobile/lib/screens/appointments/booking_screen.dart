@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../models/models.dart';
 import '../../providers/entity_providers.dart';
 import '../../utils/app_theme.dart';
+import 'availability_picker.dart';
 import 'payment_screen.dart';
 
 class BookingScreen extends StatefulWidget {
@@ -24,8 +25,7 @@ class _BookingScreenState extends State<BookingScreen> {
   List<StaffModel> _staff = [];
   SalonServiceModel? _selectedService;
   StaffModel? _selectedStaff;
-  DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
-  TimeOfDay? _selectedTime;
+  DateTime? _selectedStart;
 
   @override
   void initState() {
@@ -48,7 +48,7 @@ class _BookingScreenState extends State<BookingScreen> {
   bool get _canContinue => switch (_step) {
         0 => _selectedService != null,
         1 => _selectedStaff != null,
-        2 => _selectedTime != null,
+        2 => _selectedStart != null,
         _ => false,
       };
 
@@ -59,21 +59,13 @@ class _BookingScreenState extends State<BookingScreen> {
       return;
     }
 
-    final scheduledAt = DateTime(
-      _selectedDate.year,
-      _selectedDate.month,
-      _selectedDate.day,
-      _selectedTime!.hour,
-      _selectedTime!.minute,
-    );
-
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => PaymentScreen(
           salon: widget.salon,
           service: _selectedService!,
           staff: _selectedStaff!,
-          scheduledAt: scheduledAt,
+          scheduledAt: _selectedStart!,
         ),
       ),
     );
@@ -121,7 +113,7 @@ class _BookingScreenState extends State<BookingScreen> {
             width: double.infinity,
             child: FilledButton(
               onPressed: _canContinue ? _onContinue : null,
-              child: Text(_step == 2 ? (_selectedTime == null ? 'Pick a time to continue' : 'Continue') : 'Continue'),
+              child: Text(_step == 2 && _selectedStart == null ? 'Pick a time to continue' : 'Continue'),
             ),
           ),
         ),
@@ -144,6 +136,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 setState(() {
                   _selectedService = s;
                   _selectedStaff = null;
+                  _selectedStart = null;
                 });
                 _loadStaff();
               },
@@ -174,7 +167,10 @@ class _BookingScreenState extends State<BookingScreen> {
             final selected = _selectedStaff?.id == s.id;
             return _SelectableRow(
               selected: selected,
-              onTap: () => setState(() => _selectedStaff = s),
+              onTap: () => setState(() {
+                _selectedStaff = s;
+                _selectedStart = null;
+              }),
               leading: CircleAvatar(
                 radius: 18,
                 backgroundColor: AppColors.primaryLight,
@@ -194,76 +190,15 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Widget _buildDateTimeStep() {
-    final days = List.generate(14, (i) => DateTime.now().add(Duration(days: i + 1)));
-    final times = <TimeOfDay>[
-      for (var h = 9; h <= 18; h++) ...[TimeOfDay(hour: h, minute: 0), TimeOfDay(hour: h, minute: 30)],
-    ];
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       children: [
-        SizedBox(
-          height: 72,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: days.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemBuilder: (context, i) {
-              final day = days[i];
-              final selected = day.year == _selectedDate.year && day.month == _selectedDate.month && day.day == _selectedDate.day;
-              return GestureDetector(
-                onTap: () => setState(() {
-                  _selectedDate = day;
-                  _selectedTime = null;
-                }),
-                child: Container(
-                  width: 56,
-                  decoration: BoxDecoration(
-                    color: selected ? AppColors.primary : Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: selected ? null : Border.all(color: const Color(0xFFE5E1EF)),
-                  ),
-                  alignment: Alignment.center,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(DateFormat('E').format(day), style: TextStyle(fontSize: 11, color: selected ? Colors.white70 : AppColors.textSecondary)),
-                      const SizedBox(height: 4),
-                      Text('${day.day}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: selected ? Colors.white : AppColors.textPrimary)),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 20),
-        const Text('AVAILABLE TIMES', style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.4)),
-        const SizedBox(height: 10),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 2.2),
-          itemCount: times.length,
-          itemBuilder: (context, i) {
-            final t = times[i];
-            final selected = _selectedTime == t;
-            return GestureDetector(
-              onTap: () => setState(() => _selectedTime = t),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: selected ? AppColors.primary : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: selected ? null : Border.all(color: const Color(0xFFE5E1EF)),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  t.format(context),
-                  style: TextStyle(color: selected ? Colors.white : AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 13),
-                ),
-              ),
-            );
-          },
+        AvailabilityPicker(
+          key: ValueKey('${_selectedService!.id}-${_selectedStaff!.id}'),
+          salonId: widget.salon.id,
+          serviceId: _selectedService!.id,
+          staffId: _selectedStaff!.id,
+          onChanged: (start) => setState(() => _selectedStart = start),
         ),
         const SizedBox(height: 20),
         Container(
@@ -276,7 +211,7 @@ class _BookingScreenState extends State<BookingScreen> {
               const SizedBox(height: 10),
               _summaryRow('Service', _selectedService?.name ?? '-'),
               _summaryRow('Stylist', _selectedStaff?.fullName ?? '-'),
-              _summaryRow('When', '${DateFormat('MMM d').format(_selectedDate)} · ${_selectedTime?.format(context) ?? 'pick a time'}'),
+              _summaryRow('When', _selectedStart == null ? 'pick a time' : DateFormat('MMM d · HH:mm').format(_selectedStart!)),
               _summaryRow('Duration', '${_selectedService?.durationMinutes ?? 0} min'),
               _summaryRow('Price', '\$${(_selectedService?.price ?? 0).toStringAsFixed(2)}'),
             ],

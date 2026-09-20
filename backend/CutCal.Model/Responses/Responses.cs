@@ -212,3 +212,25 @@ public class ServicesReportResponse
     public decimal TotalRevenue { get; set; }
     public List<ServiceReportItem> Services { get; set; } = new();
 }
+
+public static class AvailabilityStatus
+{
+    public const string Free = "Free";
+    public const string Limited = "Limited";
+    public const string Full = "Full";
+    public const string Closed = "Closed";
+}
+
+public class AvailabilityDayResponse
+{
+    public DateTime Date { get; set; }
+    public string Status { get; set; } = AvailabilityStatus.Closed;
+    public int FreeSlots { get; set; }
+    public int TotalSlots { get; set; }
+}
+
+public class AvailabilitySlotResponse
+{
+    public DateTime StartsAt { get; set; }
+    public bool IsAvailable { get; set; }
+}

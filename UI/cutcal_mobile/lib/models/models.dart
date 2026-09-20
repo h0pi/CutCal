@@ -312,6 +312,41 @@ class AppointmentModel {
       );
 }
 
+class AvailabilityDayModel {
+  static const free = 'Free';
+  static const limited = 'Limited';
+  static const full = 'Full';
+  static const closed = 'Closed';
+
+  final DateTime date;
+  final String status;
+  final int freeSlots;
+  final int totalSlots;
+
+  AvailabilityDayModel({required this.date, required this.status, required this.freeSlots, required this.totalSlots});
+
+  bool get isBookable => status == free || status == limited;
+
+  factory AvailabilityDayModel.fromJson(Map<String, dynamic> json) => AvailabilityDayModel(
+        date: DateTime.parse(json['date']),
+        status: json['status'] ?? closed,
+        freeSlots: json['freeSlots'] ?? 0,
+        totalSlots: json['totalSlots'] ?? 0,
+      );
+}
+
+class AvailabilitySlotModel {
+  final DateTime startsAt;
+  final bool isAvailable;
+
+  AvailabilitySlotModel({required this.startsAt, required this.isAvailable});
+
+  factory AvailabilitySlotModel.fromJson(Map<String, dynamic> json) => AvailabilitySlotModel(
+        startsAt: DateTime.parse(json['startsAt']),
+        isAvailable: json['isAvailable'] ?? false,
+      );
+}
+
 class ReviewModel {
   final int id;
   final int appointmentId;

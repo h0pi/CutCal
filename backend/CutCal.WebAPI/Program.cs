@@ -61,6 +61,7 @@ builder.Services.AddScoped<ICityService, CityService>();
 builder.Services.AddScoped<ISalonServiceService, SalonServiceService>();
 builder.Services.AddScoped<IStaffService, StaffManagementService>();
 builder.Services.AddScoped<IAppointmentService, AppointmentService>();
+builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();

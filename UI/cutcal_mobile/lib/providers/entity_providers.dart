@@ -163,6 +163,56 @@ class PaymentProvider extends BaseProvider<Map<String, dynamic>> {
   }
 }
 
+class AvailabilityProvider extends BaseProvider<AvailabilityDayModel> {
+  @override
+  String getEndpoint() => 'Salons';
+
+  @override
+  AvailabilityDayModel fromJson(json) => AvailabilityDayModel.fromJson(json);
+
+  String _dateOnly(DateTime d) => '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  Future<List<AvailabilityDayModel>> getDays({
+    required int salonId,
+    required int serviceId,
+    required int staffId,
+    required DateTime from,
+    required int days,
+  }) async {
+    final query = getQueryString({
+      'serviceId': serviceId,
+      'staffId': staffId,
+      'from': _dateOnly(from),
+      'days': days,
+      'nowLocal': DateTime.now().toIso8601String(),
+    });
+    final uri = Uri.parse('${AuthProvider.baseUrl}Salons/$salonId/Availability/Days$query');
+    final response = await http.get(uri, headers: createHeaders());
+    final data = validateResponse(response) as List;
+    return data.map((e) => AvailabilityDayModel.fromJson(e)).toList();
+  }
+
+  Future<List<AvailabilitySlotModel>> getSlots({
+    required int salonId,
+    required int serviceId,
+    required int staffId,
+    required DateTime date,
+    int? excludeAppointmentId,
+  }) async {
+    final query = getQueryString({
+      'serviceId': serviceId,
+      'staffId': staffId,
+      'date': _dateOnly(date),
+      'excludeAppointmentId': excludeAppointmentId,
+      'nowLocal': DateTime.now().toIso8601String(),
+    });
+    final uri = Uri.parse('${AuthProvider.baseUrl}Salons/$salonId/Availability/Slots$query');
+    final response = await http.get(uri, headers: createHeaders());
+    final data = validateResponse(response) as List;
+    return data.map((e) => AvailabilitySlotModel.fromJson(e)).toList();
+  }
+}
+
 class ReportProvider extends BaseProvider<Map<String, dynamic>> {
   @override
   String getEndpoint() => 'Reports';
