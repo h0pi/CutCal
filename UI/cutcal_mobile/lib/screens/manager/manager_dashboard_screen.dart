@@ -50,10 +50,17 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
     final prevWeekStart = weekStart.subtract(const Duration(days: 7));
 
     // The backend automatically scopes both of these to salons this manager owns.
-    final salons = await context.read<SalonProvider>().get(filter: {'pageSize': 20});
-    final appointments = await context.read<AppointmentProvider>().get(filter: {'pageSize': 200});
-    final thisWeekReport = await context.read<ReportProvider>().getSummary(dateFrom: weekStart, dateTo: now);
-    final prevWeekReport = await context.read<ReportProvider>().getSummary(dateFrom: prevWeekStart, dateTo: weekStart);
+    // The four calls are independent, so they're kicked off together instead of
+    // one after another — this runs every 20s via the poll timer, so it matters.
+    final salonsFuture = context.read<SalonProvider>().get(filter: {'pageSize': 20});
+    final appointmentsFuture = context.read<AppointmentProvider>().get(filter: {'pageSize': 200});
+    final thisWeekReportFuture = context.read<ReportProvider>().getSummary(dateFrom: weekStart, dateTo: now);
+    final prevWeekReportFuture = context.read<ReportProvider>().getSummary(dateFrom: prevWeekStart, dateTo: weekStart);
+
+    final salons = await salonsFuture;
+    final appointments = await appointmentsFuture;
+    final thisWeekReport = await thisWeekReportFuture;
+    final prevWeekReport = await prevWeekReportFuture;
 
     final pending = appointments.items.where((a) => a.stateName == 'Pending');
     final todays = appointments.items.where((a) =>

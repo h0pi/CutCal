@@ -29,10 +29,15 @@ class _ManagerStaffScreenState extends State<ManagerStaffScreen> {
 
   Future<void> _load() async {
     setState(() => _isLoading = true);
-    // All three are auto-scoped server-side to salons this manager owns.
-    final salons = await context.read<SalonProvider>().get(filter: {'pageSize': 20});
-    final services = await context.read<SalonServiceProvider>().get(filter: {'pageSize': 200});
-    final staff = await context.read<StaffProvider>().get(filter: {'pageSize': 200});
+    // All three are auto-scoped server-side to salons this manager owns, and
+    // independent of each other, so they're fetched concurrently.
+    final salonsFuture = context.read<SalonProvider>().get(filter: {'pageSize': 20});
+    final servicesFuture = context.read<SalonServiceProvider>().get(filter: {'pageSize': 200});
+    final staffFuture = context.read<StaffProvider>().get(filter: {'pageSize': 200});
+
+    final salons = await salonsFuture;
+    final services = await servicesFuture;
+    final staff = await staffFuture;
     if (!mounted) return;
     setState(() {
       _salons = salons.items;

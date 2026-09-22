@@ -35,9 +35,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final reviews = context.read<ReviewProvider>();
     final favorites = context.read<FavoriteProvider>();
 
-    final visitsResult = await appointments.get(filter: {'customerId': userId, 'status': 'Completed', 'pageSize': 1});
-    final reviewsResult = await reviews.get(filter: {'customerId': userId, 'pageSize': 1});
-    final savedResult = await favorites.getMine();
+    final visitsFuture = appointments.get(filter: {'customerId': userId, 'status': 'Completed', 'pageSize': 1});
+    final reviewsFuture = reviews.get(filter: {'customerId': userId, 'pageSize': 1});
+    final savedFuture = favorites.getMine();
+
+    final visitsResult = await visitsFuture;
+    final reviewsResult = await reviewsFuture;
+    final savedResult = await savedFuture;
     if (!mounted) return;
     setState(() {
       _visits = visitsResult.totalCount;

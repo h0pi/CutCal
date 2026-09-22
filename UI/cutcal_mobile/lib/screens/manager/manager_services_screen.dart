@@ -27,9 +27,13 @@ class _ManagerServicesScreenState extends State<ManagerServicesScreen> {
 
   Future<void> _load() async {
     setState(() => _isLoading = true);
-    // Both endpoints are auto-scoped server-side to salons this manager owns.
-    final salons = await context.read<SalonProvider>().get(filter: {'pageSize': 20});
-    final services = await context.read<SalonServiceProvider>().get(filter: {'pageSize': 200});
+    // Both endpoints are auto-scoped server-side to salons this manager owns,
+    // and independent of each other, so they're fetched concurrently.
+    final salonsFuture = context.read<SalonProvider>().get(filter: {'pageSize': 20});
+    final servicesFuture = context.read<SalonServiceProvider>().get(filter: {'pageSize': 200});
+
+    final salons = await salonsFuture;
+    final services = await servicesFuture;
     if (!mounted) return;
     setState(() {
       _salons = salons.items;

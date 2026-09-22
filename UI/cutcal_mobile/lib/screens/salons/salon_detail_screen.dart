@@ -66,12 +66,22 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     final serviceProvider = context.read<SalonServiceProvider>();
     final favoriteProvider = context.read<FavoriteProvider>();
 
-    final salon = await salonProvider.getById(widget.salonId);
-    final gallery = await salonProvider.getGallery(widget.salonId);
-    final reviews = await reviewProvider.get(filter: {'salonId': widget.salonId, 'pageSize': 20});
-    final staff = await staffProvider.get(filter: {'salonId': widget.salonId, 'isActive': true, 'pageSize': 50});
-    final services = await serviceProvider.get(filter: {'salonId': widget.salonId, 'isActive': true, 'pageSize': 50});
-    final favorites = await favoriteProvider.getMine();
+    // Kicked off together (each call fires its request immediately) and only
+    // awaited below, so the six independent calls run concurrently instead of
+    // one after another.
+    final salonFuture = salonProvider.getById(widget.salonId);
+    final galleryFuture = salonProvider.getGallery(widget.salonId);
+    final reviewsFuture = reviewProvider.get(filter: {'salonId': widget.salonId, 'pageSize': 20});
+    final staffFuture = staffProvider.get(filter: {'salonId': widget.salonId, 'isActive': true, 'pageSize': 50});
+    final servicesFuture = serviceProvider.get(filter: {'salonId': widget.salonId, 'isActive': true, 'pageSize': 50});
+    final favoritesFuture = favoriteProvider.getMine();
+
+    final salon = await salonFuture;
+    final gallery = await galleryFuture;
+    final reviews = await reviewsFuture;
+    final staff = await staffFuture;
+    final services = await servicesFuture;
+    final favorites = await favoritesFuture;
 
     if (!mounted) return;
     setState(() {
