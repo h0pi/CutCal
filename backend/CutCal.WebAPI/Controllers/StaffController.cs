@@ -1,3 +1,4 @@
+using CutCal.Model.Constants;
 using CutCal.Model.Requests;
 using CutCal.Model.Responses;
 using CutCal.Model.SearchObjects;
@@ -15,14 +16,14 @@ public class StaffController : BaseCRUDController<StaffResponse, StaffSearchObje
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin,SalonManager")]
+    [Authorize(Roles = RoleNames.AdminOrManager)]
     public override Task<ActionResult<StaffResponse>> Insert([FromBody] StaffInsertRequest request) => base.Insert(request);
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = "Admin,SalonManager")]
+    [Authorize(Roles = RoleNames.AdminOrManager)]
     public override Task<ActionResult<StaffResponse>> Update(int id, [FromBody] StaffUpdateRequest request) => base.Update(id, request);
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = "Admin,SalonManager")]
+    [Authorize(Roles = RoleNames.AdminOrManager)]
     public override Task<IActionResult> Delete(int id) => base.Delete(id);
 }

@@ -1,3 +1,4 @@
+using CutCal.Model.Constants;
 using CutCal.Model.Requests;
 using CutCal.Model.Responses;
 using CutCal.Model.SearchObjects;
@@ -37,7 +38,7 @@ public class StaffManagementService : BaseCRUDService<Staff, StaffResponse, Staf
     {
         // Staff listings stay public for browsing (a Customer picks staff while booking), only
         // a SalonManager is scoped down to staff at salons they manage.
-        if (_userAccessor.IsInRole("SalonManager"))
+        if (_userAccessor.IsInRole(RoleNames.SalonManager))
         {
             query = query.Where(x => x.Salon.OwnerId == _userAccessor.UserId);
         }

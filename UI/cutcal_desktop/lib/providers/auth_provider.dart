@@ -7,10 +7,11 @@ import 'package:jwt_decoder/jwt_decoder.dart';
 import '../utils/api_client_exception.dart';
 
 class AuthProvider with ChangeNotifier {
-  static String baseUrl = const String.fromEnvironment(
-    'baseUrl',
-    defaultValue: 'http://localhost:5194/',
-  );
+  /// API address, set at build/run time: `--dart-define=API_BASE_URL=http://host:port`.
+  /// A trailing slash is optional; it is added when missing.
+  static String baseUrl = _withTrailingSlash(const String.fromEnvironment('API_BASE_URL', defaultValue: 'http://localhost:5194'));
+
+  static String _withTrailingSlash(String url) => url.endsWith('/') ? url : '$url/';
 
   static String? accessToken;
   static String? refreshToken;

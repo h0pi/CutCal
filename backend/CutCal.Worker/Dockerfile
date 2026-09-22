@@ -3,11 +3,11 @@ WORKDIR /app
 
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
-COPY CutCal.Model/CutCal.Model.csproj CutCal.Model/
+COPY CutCal.Messaging/CutCal.Messaging.csproj CutCal.Messaging/
 COPY CutCal.Worker/CutCal.Worker.csproj CutCal.Worker/
 RUN dotnet restore CutCal.Worker/CutCal.Worker.csproj
 
-COPY CutCal.Model/ CutCal.Model/
+COPY CutCal.Messaging/ CutCal.Messaging/
 COPY CutCal.Worker/ CutCal.Worker/
 RUN dotnet publish CutCal.Worker/CutCal.Worker.csproj -c Release -o /app/publish --no-restore
 

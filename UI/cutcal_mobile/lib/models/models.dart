@@ -61,19 +61,6 @@ class SalonCategoryModel {
   Map<String, dynamic> toJson() => {'name': name};
 }
 
-class CityModel {
-  final int id;
-  final String name;
-  final String country;
-
-  CityModel({required this.id, required this.name, required this.country});
-
-  factory CityModel.fromJson(Map<String, dynamic> json) =>
-      CityModel(id: json['id'], name: json['name'] ?? '', country: json['country'] ?? '');
-
-  Map<String, dynamic> toJson() => {'name': name, 'country': country};
-}
-
 class SalonWorkingHoursModel {
   final int? id;
   final int dayOfWeek;

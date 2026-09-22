@@ -1,3 +1,4 @@
+using CutCal.Model.Constants;
 using CutCal.Model.Requests;
 using CutCal.Model.Responses;
 using CutCal.Services.Services;
@@ -31,7 +32,7 @@ public class PaymentsController : ControllerBase
     }
 
     [HttpPost("Refund/{id:int}")]
-    [Authorize(Roles = "Admin,SalonManager")]
+    [Authorize(Roles = RoleNames.AdminOrManager)]
     public async Task<ActionResult<PaymentResponse>> Refund(int id)
     {
         return Ok(await _service.RefundAsync(id));

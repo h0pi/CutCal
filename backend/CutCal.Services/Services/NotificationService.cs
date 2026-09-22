@@ -11,7 +11,8 @@ namespace CutCal.Services.Services;
 
 public interface INotificationService : IBaseReadService<NotificationResponse, NotificationSearchObject>
 {
-    Task<NotificationResponse> CreateAsync(int userId, string title, string body, string type);
+    /// <summary>Queues a notification on the shared DbContext; it is stored by the caller's next SaveChanges.</summary>
+    void Add(int userId, string title, string body, string type);
     Task MarkReadAsync(int id, int userId);
     Task MarkAllReadAsync(int userId);
     Task<PageResult<NotificationResponse>> GetForUserAsync(int userId, NotificationSearchObject search);
@@ -44,9 +45,9 @@ public class NotificationService : BaseReadService<Notification, NotificationRes
         return new PageResult<NotificationResponse> { Items = items.Adapt<List<NotificationResponse>>(), TotalCount = totalCount };
     }
 
-    public async Task<NotificationResponse> CreateAsync(int userId, string title, string body, string type)
+    public void Add(int userId, string title, string body, string type)
     {
-        var notification = new Notification
+        Context.Notifications.Add(new Notification
         {
             UserId = userId,
             Title = title,
@@ -54,10 +55,7 @@ public class NotificationService : BaseReadService<Notification, NotificationRes
             Type = type,
             IsRead = false,
             SentAt = DateTime.UtcNow
-        };
-        Context.Notifications.Add(notification);
-        await Context.SaveChangesAsync();
-        return notification.Adapt<NotificationResponse>();
+        });
     }
 
     public async Task MarkReadAsync(int id, int userId)

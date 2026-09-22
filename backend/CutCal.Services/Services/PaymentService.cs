@@ -1,3 +1,5 @@
+using CutCal.Messaging;
+using CutCal.Model.Constants;
 using CutCal.Model.Exceptions;
 using CutCal.Model.Responses;
 using CutCal.Services.Database;
@@ -48,7 +50,7 @@ public class PaymentService : IPaymentService
         var appointment = await _context.Appointments.Include(x => x.Payment).FirstOrDefaultAsync(x => x.Id == appointmentId)
             ?? throw new ClientException("Appointment not found.");
 
-        if (appointment.Payment is { Status: "Paid" })
+        if (appointment.Payment is { Status: PaymentStatusNames.Paid })
         {
             throw new ClientException("This appointment has already been paid for.");
         }
@@ -85,7 +87,7 @@ public class PaymentService : IPaymentService
             payment.PaypalOrderId = result.Id;
             payment.Amount = appointment.Price;
             payment.Currency = "USD";
-            payment.Status = "Created";
+            payment.Status = PaymentStatusNames.Created;
             if (appointment.Payment is null)
             {
                 _context.Payments.Add(payment);
@@ -104,10 +106,10 @@ public class PaymentService : IPaymentService
 
     public async Task<PaymentResponse> CaptureOrderAsync(string paypalOrderId, int appointmentId)
     {
-        var appointment = await _context.Appointments.Include(x => x.Payment).Include(x => x.Salon).FirstOrDefaultAsync(x => x.Id == appointmentId)
+        var appointment = await _context.Appointments.Include(x => x.Payment).Include(x => x.Salon).Include(x => x.Customer).FirstOrDefaultAsync(x => x.Id == appointmentId)
             ?? throw new ClientException("Appointment not found.");
 
-        if (appointment.Payment is { Status: "Paid" })
+        if (appointment.Payment is { Status: PaymentStatusNames.Paid })
         {
             return MapPaymentResponse(appointment.Payment);
         }
@@ -126,20 +128,21 @@ public class PaymentService : IPaymentService
             payment.PaypalCaptureId = captureId;
             payment.Amount = appointment.Price;
             payment.Currency = "USD";
-            payment.Status = "Paid";
+            payment.Status = PaymentStatusNames.Paid;
             if (appointment.Payment is null)
             {
                 _context.Payments.Add(payment);
             }
 
             appointment.PaypalCaptureId = captureId;
-            appointment.PaymentStatus = "Paid";
-            await _context.SaveChangesAsync();
+            appointment.PaymentStatus = PaymentStatusNames.Paid;
 
-            await _notificationService.CreateAsync(appointment.CustomerId, "Payment received",
+            _notificationService.Add(appointment.CustomerId, "Payment received",
                 $"Your payment of {payment.Amount:C} for the appointment at {appointment.Salon.Name} was received.",
                 nameof(CutCal.Model.Enums.NotificationType.PaymentReceived));
-            await _publisher.PublishAsync("payment.captured", new { Type = "AppointmentConfirmed", appointment.Id });
+            await _context.SaveChangesAsync();
+
+            await _publisher.PublishAsync(BuildMessage(NotificationMessageTypes.PaymentReceived, appointment, payment.Amount));
 
             return MapPaymentResponse(payment);
         }
@@ -152,10 +155,10 @@ public class PaymentService : IPaymentService
 
     public async Task<PaymentResponse> RefundAsync(int appointmentId)
     {
-        var appointment = await _context.Appointments.Include(x => x.Payment).Include(x => x.Salon).FirstOrDefaultAsync(x => x.Id == appointmentId)
+        var appointment = await _context.Appointments.Include(x => x.Payment).Include(x => x.Salon).Include(x => x.Customer).FirstOrDefaultAsync(x => x.Id == appointmentId)
             ?? throw new ClientException("Appointment not found.");
         var payment = appointment.Payment ?? throw new ClientException("No payment found for this appointment.");
-        if (payment.Status != "Paid")
+        if (payment.Status != PaymentStatusNames.Paid)
         {
             throw new ClientException("Only paid appointments can be refunded.");
         }
@@ -170,13 +173,15 @@ public class PaymentService : IPaymentService
         {
             await _client.Execute(request);
 
-            payment.Status = "Refunded";
-            appointment.PaymentStatus = "Refunded";
-            await _context.SaveChangesAsync();
+            payment.Status = PaymentStatusNames.Refunded;
+            appointment.PaymentStatus = PaymentStatusNames.Refunded;
 
-            await _notificationService.CreateAsync(appointment.CustomerId, "Payment refunded",
+            _notificationService.Add(appointment.CustomerId, "Payment refunded",
                 $"Your payment of {payment.Amount:C} for the appointment at {appointment.Salon.Name} was refunded.",
                 nameof(CutCal.Model.Enums.NotificationType.PaymentRefunded));
+            await _context.SaveChangesAsync();
+
+            await _publisher.PublishAsync(BuildMessage(NotificationMessageTypes.PaymentRefunded, appointment, payment.Amount));
 
             return MapPaymentResponse(payment);
         }
@@ -186,6 +191,17 @@ public class PaymentService : IPaymentService
             throw new ClientException("Unable to refund PayPal payment.");
         }
     }
+
+    private static NotificationMessage BuildMessage(string type, Appointment appointment, decimal amount) => new()
+    {
+        Type = type,
+        AppointmentId = appointment.Id,
+        CustomerEmail = appointment.Customer.Email,
+        CustomerName = appointment.Customer.FirstName,
+        SalonName = appointment.Salon.Name,
+        ScheduledAt = appointment.ScheduledAt,
+        Amount = amount
+    };
 
     private static PaymentResponse MapPaymentResponse(Payment payment) => new()
     {

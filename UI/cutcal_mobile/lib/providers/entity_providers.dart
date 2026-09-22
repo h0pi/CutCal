@@ -14,14 +14,6 @@ class SalonCategoryProvider extends BaseProvider<SalonCategoryModel> {
   SalonCategoryModel fromJson(json) => SalonCategoryModel.fromJson(json);
 }
 
-class CityProvider extends BaseProvider<CityModel> {
-  @override
-  String getEndpoint() => 'Cities';
-
-  @override
-  CityModel fromJson(json) => CityModel.fromJson(json);
-}
-
 class SalonProvider extends BaseProvider<SalonModel> {
   @override
   String getEndpoint() => 'Salons';

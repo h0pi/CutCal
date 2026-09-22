@@ -1,3 +1,4 @@
+using CutCal.Model.Constants;
 using CutCal.Model.Common;
 using CutCal.Model.Requests;
 using CutCal.Model.Responses;
@@ -37,14 +38,14 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Customer")]
+    [Authorize(Roles = RoleNames.Customer)]
     public async Task<ActionResult<AppointmentResponse>> Insert([FromBody] AppointmentInsertRequest request)
     {
         return Ok(await _service.InsertAsync(request, _userAccessor.UserId));
     }
 
     [HttpPut("{id:int}/Confirm")]
-    [Authorize(Roles = "Admin,SalonManager")]
+    [Authorize(Roles = RoleNames.AdminOrManager)]
     public async Task<ActionResult<AppointmentResponse>> Confirm(int id)
     {
         return Ok(await _service.ConfirmAsync(id, _userAccessor.UserId));
@@ -57,14 +58,14 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPut("{id:int}/Complete")]
-    [Authorize(Roles = "Admin,SalonManager,Staff")]
+    [Authorize(Roles = RoleNames.AdminManagerOrStaff)]
     public async Task<ActionResult<AppointmentResponse>> Complete(int id)
     {
         return Ok(await _service.CompleteAsync(id));
     }
 
     [HttpPut("{id:int}/Reschedule")]
-    [Authorize(Roles = "Customer")]
+    [Authorize(Roles = RoleNames.Customer)]
     public async Task<ActionResult<AppointmentResponse>> Reschedule(int id, [FromBody] AppointmentRescheduleRequest request)
     {
         return Ok(await _service.RescheduleAsync(id, request.ScheduledAt, _userAccessor.UserId));

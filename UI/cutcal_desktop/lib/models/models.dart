@@ -345,64 +345,6 @@ class ReviewModel {
       );
 }
 
-class NotificationModel {
-  final int id;
-  final int userId;
-  final String title;
-  final String body;
-  final String type;
-  final bool isRead;
-  final DateTime sentAt;
-
-  NotificationModel({
-    required this.id,
-    required this.userId,
-    required this.title,
-    required this.body,
-    required this.type,
-    this.isRead = false,
-    required this.sentAt,
-  });
-
-  factory NotificationModel.fromJson(Map<String, dynamic> json) => NotificationModel(
-        id: json['id'],
-        userId: json['userId'],
-        title: json['title'] ?? '',
-        body: json['body'] ?? '',
-        type: json['type'] ?? '',
-        isRead: json['isRead'] ?? false,
-        sentAt: DateTime.parse(json['sentAt']),
-      );
-}
-
-class FavoriteModel {
-  final int userId;
-  final int salonId;
-  final String? salonName;
-
-  FavoriteModel({required this.userId, required this.salonId, this.salonName});
-
-  factory FavoriteModel.fromJson(Map<String, dynamic> json) => FavoriteModel(
-        userId: json['userId'],
-        salonId: json['salonId'],
-        salonName: json['salonName'],
-      );
-}
-
-class RecommendationModel {
-  final SalonModel salon;
-  final double score;
-  final String reason;
-
-  RecommendationModel({required this.salon, required this.score, required this.reason});
-
-  factory RecommendationModel.fromJson(Map<String, dynamic> json) => RecommendationModel(
-        salon: SalonModel.fromJson(json['salon']),
-        score: (json['score'] ?? 0).toDouble(),
-        reason: json['reason'] ?? '',
-      );
-}
-
 class GeocodeResultModel {
   final String displayName;
   final double latitude;

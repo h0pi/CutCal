@@ -1,3 +1,4 @@
+using CutCal.Model.Constants;
 using CutCal.Model.Responses;
 using CutCal.Services.Database;
 using Mapster;
@@ -25,7 +26,7 @@ public static class MapsterConfig
             .Map(dest => dest.SalonName, src => src.Salon != null ? src.Salon.Name : null)
             .Map(dest => dest.StaffName, src => src.Staff != null && src.Staff.User != null ? src.Staff.User.FirstName + " " + src.Staff.User.LastName : null)
             .Map(dest => dest.ServiceName, src => src.Service != null ? src.Service.Name : null)
-            .Map(dest => dest.IsPaid, src => src.PaymentStatus == "Paid")
+            .Map(dest => dest.IsPaid, src => src.PaymentStatus == PaymentStatusNames.Paid)
             .Map(dest => dest.HasReview, src => src.Review != null);
 
         TypeAdapterConfig<Review, ReviewResponse>.NewConfig()

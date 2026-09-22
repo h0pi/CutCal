@@ -8,7 +8,6 @@ import '../utils/api_client_exception.dart';
 import 'auth_provider.dart';
 
 abstract class BaseProvider<T> with ChangeNotifier {
-  static String? baseUrl = AuthProvider.baseUrl;
   static const _requestTimeout = Duration(seconds: 20);
 
   String getEndpoint();

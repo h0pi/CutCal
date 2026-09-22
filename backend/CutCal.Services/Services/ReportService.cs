@@ -1,3 +1,4 @@
+using CutCal.Model.Constants;
 using CutCal.Model.Exceptions;
 using CutCal.Model.Responses;
 using CutCal.Services.Auth;
@@ -39,7 +40,7 @@ public class ReportService : IReportService
     /// </summary>
     private async Task<int[]?> ResolveAllowedSalonIdsAsync(int? requestedSalonId)
     {
-        if (_userAccessor.IsInRole("Admin"))
+        if (_userAccessor.IsInRole(RoleNames.Admin))
         {
             return requestedSalonId.HasValue ? new[] { requestedSalonId.Value } : null;
         }
@@ -81,10 +82,10 @@ public class ReportService : IReportService
         return new AppointmentsReportResponse
         {
             TotalAppointments = appointments.Count,
-            ConfirmedCount = appointments.Count(x => x.StateName == "Confirmed"),
-            CancelledCount = appointments.Count(x => x.StateName == "Cancelled"),
-            CompletedCount = appointments.Count(x => x.StateName == "Completed"),
-            TotalRevenue = appointments.Where(x => x.PaymentStatus == "Paid").Sum(x => x.Price),
+            ConfirmedCount = appointments.Count(x => x.StateName == AppointmentStateNames.Confirmed),
+            CancelledCount = appointments.Count(x => x.StateName == AppointmentStateNames.Cancelled),
+            CompletedCount = appointments.Count(x => x.StateName == AppointmentStateNames.Completed),
+            TotalRevenue = appointments.Where(x => x.PaymentStatus == PaymentStatusNames.Paid).Sum(x => x.Price),
             Appointments = appointments.Select(a => new AppointmentResponse
             {
                 Id = a.Id,
@@ -127,7 +128,7 @@ public class ReportService : IReportService
             {
                 ServiceName = g.Key.Name,
                 AppointmentCount = g.Count(),
-                TotalRevenue = g.Where(a => a.PaymentStatus == "Paid").Sum(a => a.Price),
+                TotalRevenue = g.Where(a => a.PaymentStatus == PaymentStatusNames.Paid).Sum(a => a.Price),
                 AverageRating = ratings.Where(r => r.Appointment.ServiceId == g.Key.ServiceId).Select(r => (double)r.Rating).DefaultIfEmpty(0).Average()
             })
             .OrderByDescending(x => x.AppointmentCount)

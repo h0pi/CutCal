@@ -1,12 +1,15 @@
+using CutCal.Messaging;
 using MailKit.Net.Smtp;
 using MailKit.Security;
-using Microsoft.Extensions.Logging;
 using MimeKit;
 
 namespace CutCal.Worker.Email;
 
 public class EmailService : IEmailService
 {
+    private const int DefaultSmtpPort = 587;
+    private const string FallbackSender = "no-reply@cutcal.com";
+
     private readonly ILogger<EmailService> _logger;
     private readonly string _host;
     private readonly int _port;
@@ -18,41 +21,42 @@ public class EmailService : IEmailService
     {
         _logger = logger;
         _host = Environment.GetEnvironmentVariable("Smtp__Host") ?? "localhost";
-        _port = int.TryParse(Environment.GetEnvironmentVariable("Smtp__Port"), out var port) ? port : 587;
+        _port = int.TryParse(Environment.GetEnvironmentVariable("Smtp__Port"), out var port) ? port : DefaultSmtpPort;
         _username = Environment.GetEnvironmentVariable("Smtp__Username") ?? string.Empty;
         _password = Environment.GetEnvironmentVariable("Smtp__Password") ?? string.Empty;
         _useSsl = bool.TryParse(Environment.GetEnvironmentVariable("Smtp__UseSsl"), out var ssl) && ssl;
     }
 
-    public Task SendAppointmentConfirmed(string email, string customerName, string salonName, DateTime scheduledAt)
-    {
-        return SendAsync(email, "Appointment confirmed",
-            $"Hi {customerName}, your appointment at {salonName} on {scheduledAt:g} has been confirmed.");
-    }
+    public Task SendAppointmentRequested(NotificationMessage message) => SendAsync(message, "Appointment request received",
+        $"Hi {message.CustomerName}, we received your request for {message.SalonName} on {message.ScheduledAt:f}. The salon will confirm it shortly.");
 
-    public Task SendAppointmentCancelled(string email, string customerName, string salonName, string? reason)
-    {
-        return SendAsync(email, "Appointment cancelled",
-            $"Hi {customerName}, your appointment at {salonName} was cancelled. Reason: {reason}");
-    }
+    public Task SendAppointmentConfirmed(NotificationMessage message) => SendAsync(message, "Appointment confirmed",
+        $"Hi {message.CustomerName}, your appointment at {message.SalonName} on {message.ScheduledAt:f} is confirmed. See you soon!");
 
-    public Task SendAppointmentReminder(string email, string customerName, string salonName, DateTime scheduledAt)
-    {
-        return SendAsync(email, "Appointment reminder",
-            $"Hi {customerName}, this is a reminder for your appointment at {salonName} on {scheduledAt:g}.");
-    }
+    public Task SendAppointmentCancelled(NotificationMessage message) => SendAsync(message, "Appointment cancelled",
+        $"Hi {message.CustomerName}, your appointment at {message.SalonName} on {message.ScheduledAt:f} was cancelled. Reason: {message.Reason}");
 
-    private async Task SendAsync(string toEmail, string subject, string body)
+    public Task SendAppointmentRescheduled(NotificationMessage message) => SendAsync(message, "Appointment rescheduled",
+        $"Hi {message.CustomerName}, your appointment at {message.SalonName} has been moved to {message.ScheduledAt:f}.");
+
+    public Task SendPaymentReceived(NotificationMessage message) => SendAsync(message, "Payment received",
+        $"Hi {message.CustomerName}, we received your payment of {message.Amount:0.00} for your appointment at {message.SalonName} on {message.ScheduledAt:f}. Thank you!");
+
+    public Task SendPaymentRefunded(NotificationMessage message) => SendAsync(message, "Payment refunded",
+        $"Hi {message.CustomerName}, your payment of {message.Amount:0.00} for the appointment at {message.SalonName} has been refunded.");
+
+    private async Task SendAsync(NotificationMessage notification, string subject, string body)
     {
-        if (string.IsNullOrWhiteSpace(toEmail))
+        if (string.IsNullOrWhiteSpace(notification.CustomerEmail))
         {
-            _logger.LogWarning("Skipping email '{Subject}' because recipient address is empty.", subject);
+            // Retrying cannot help without an address, so this is logged and skipped rather than thrown.
+            _logger.LogWarning("Skipping '{Subject}' for appointment {AppointmentId}: the customer has no e-mail address.", subject, notification.AppointmentId);
             return;
         }
 
         var message = new MimeMessage();
-        message.From.Add(MailboxAddress.Parse(string.IsNullOrWhiteSpace(_username) ? "no-reply@cutcal.com" : _username));
-        message.To.Add(MailboxAddress.Parse(toEmail));
+        message.From.Add(MailboxAddress.Parse(string.IsNullOrWhiteSpace(_username) ? FallbackSender : _username));
+        message.To.Add(new MailboxAddress(notification.CustomerName, notification.CustomerEmail));
         message.Subject = subject;
         message.Body = new TextPart("plain") { Text = body };
 
@@ -66,11 +70,12 @@ public class EmailService : IEmailService
             }
             await client.SendAsync(message);
             await client.DisconnectAsync(true);
-            _logger.LogInformation("Sent email '{Subject}' to {Recipient}", subject, toEmail);
+            _logger.LogInformation("Sent '{Subject}' to {Recipient} for appointment {AppointmentId}", subject, notification.CustomerEmail, notification.AppointmentId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send email '{Subject}' to {Recipient}", subject, toEmail);
+            _logger.LogError(ex, "Failed to send '{Subject}' to {Recipient}", subject, notification.CustomerEmail);
+            throw;
         }
     }
 }

@@ -6,12 +6,14 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 COPY CutCal.Model/CutCal.Model.csproj CutCal.Model/
 COPY CutCal.Common.Services/CutCal.Common.Services.csproj CutCal.Common.Services/
+COPY CutCal.Messaging/CutCal.Messaging.csproj CutCal.Messaging/
 COPY CutCal.Services/CutCal.Services.csproj CutCal.Services/
 COPY CutCal.WebAPI/CutCal.WebAPI.csproj CutCal.WebAPI/
 RUN dotnet restore CutCal.WebAPI/CutCal.WebAPI.csproj
 
 COPY CutCal.Model/ CutCal.Model/
 COPY CutCal.Common.Services/ CutCal.Common.Services/
+COPY CutCal.Messaging/ CutCal.Messaging/
 COPY CutCal.Services/ CutCal.Services/
 COPY CutCal.WebAPI/ CutCal.WebAPI/
 RUN dotnet publish CutCal.WebAPI/CutCal.WebAPI.csproj -c Release -o /app/publish --no-restore

@@ -1,3 +1,4 @@
+using CutCal.Model.Constants;
 using CutCal.Model.Requests;
 using CutCal.Model.Responses;
 using CutCal.Model.SearchObjects;
@@ -8,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace CutCal.WebAPI.Controllers;
 
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = RoleNames.Admin)]
 public class UsersController : BaseCRUDController<UserResponse, UserSearchObject, UserInsertRequest, UserUpdateRequest, IUserService>
 {
     public UsersController(IUserService service) : base(service)

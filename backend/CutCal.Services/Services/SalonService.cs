@@ -1,3 +1,4 @@
+using CutCal.Model.Constants;
 using CutCal.Model.Exceptions;
 using CutCal.Model.Requests;
 using CutCal.Model.Responses;
@@ -14,7 +15,6 @@ namespace CutCal.Services.Services;
 public interface ISalonService : IBaseCRUDService<SalonResponse, SalonSearchObject, SalonInsertRequest, SalonUpdateRequest>
 {
     Task<SalonResponse> ApproveAsync(int id);
-    Task UpdateAvgRatingAsync(int salonId);
     Task<List<SalonGalleryResponse>> GetGalleryAsync(int salonId);
     Task<SalonGalleryResponse> AddGalleryImageAsync(int salonId, SalonGalleryInsertRequest request);
     Task LogCategorySearchAsync(int userId, int categoryId);
@@ -61,7 +61,7 @@ public class SalonManagementService : BaseCRUDService<Salon, SalonResponse, Salo
     {
         // A SalonManager only ever sees their own salon(s), whether approved yet or not
         // (they need to see a freshly-created, still-pending-approval salon of their own).
-        if (_userAccessor.IsInRole("SalonManager"))
+        if (_userAccessor.IsInRole(RoleNames.SalonManager))
         {
             query = query.Where(x => x.OwnerId == _userAccessor.UserId);
         }
@@ -86,7 +86,7 @@ public class SalonManagementService : BaseCRUDService<Salon, SalonResponse, Salo
         {
             query = query.Where(x => x.IsApproved == search.IsApproved.Value);
         }
-        else if (!_userAccessor.IsInRole("SalonManager"))
+        else if (!_userAccessor.IsInRole(RoleNames.SalonManager))
         {
             // Public/customer browsing only ever sees approved salons by default.
             query = query.Where(x => x.IsApproved);
@@ -147,23 +147,6 @@ public class SalonManagementService : BaseCRUDService<Salon, SalonResponse, Salo
         salon.IsApproved = true;
         await Context.SaveChangesAsync();
         return salon.Adapt<SalonResponse>();
-    }
-
-    public async Task UpdateAvgRatingAsync(int salonId)
-    {
-        var salon = await Context.Salons.FindAsync(salonId);
-        if (salon is null)
-        {
-            return;
-        }
-
-        var ratings = await Context.Reviews
-            .Where(r => r.SalonId == salonId && !r.IsRemoved)
-            .Select(r => r.Rating)
-            .ToListAsync();
-
-        salon.AvgRating = ratings.Count > 0 ? Math.Round(ratings.Average(), 2) : 0;
-        await Context.SaveChangesAsync();
     }
 
     public async Task<List<SalonGalleryResponse>> GetGalleryAsync(int salonId)

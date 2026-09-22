@@ -1,3 +1,4 @@
+using CutCal.Model.Constants;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -27,7 +28,7 @@ public static class DemoDataSeeder
             .ToListAsync();
 
         var customerIds = await context.UserRoles
-            .Where(x => x.Role.Name == "Customer" && x.User.IsActive)
+            .Where(x => x.Role.Name == RoleNames.Customer && x.User.IsActive)
             .OrderBy(x => x.UserId)
             .Select(x => x.UserId)
             .ToListAsync();
@@ -37,7 +38,7 @@ public static class DemoDataSeeder
         }
 
         var upcoming = await context.Appointments
-            .Where(x => x.ScheduledAt > now && x.StateName != "Cancelled")
+            .Where(x => x.ScheduledAt > now && x.StateName != AppointmentStateNames.Cancelled)
             .Select(x => new { x.SalonId, x.StaffId, x.ScheduledAt, x.DurationMinutes })
             .ToListAsync();
 
@@ -78,9 +79,9 @@ public static class DemoDataSeeder
                     ScheduledAt = start.Value,
                     DurationMinutes = service.DurationMinutes,
                     Price = service.Price,
-                    StateName = confirmed ? "Confirmed" : "Pending",
-                    PaymentMethod = k % 2 == 0 ? "Cash" : "PayPal",
-                    PaymentStatus = "Unpaid",
+                    StateName = confirmed ? AppointmentStateNames.Confirmed : AppointmentStateNames.Pending,
+                    PaymentMethod = k % 2 == 0 ? PaymentMethodNames.Cash : PaymentMethodNames.PayPal,
+                    PaymentStatus = PaymentStatusNames.Unpaid,
                     ApprovedById = confirmed ? salon.OwnerId : null,
                     ApprovedAt = confirmed ? now : null,
                     CreatedAt = now

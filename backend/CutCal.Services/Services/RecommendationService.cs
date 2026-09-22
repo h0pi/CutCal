@@ -1,3 +1,4 @@
+using CutCal.Model.Constants;
 using CutCal.Model.Responses;
 using CutCal.Services.Database;
 using Mapster;
@@ -71,8 +72,8 @@ public class RecommendationService : IRecommendationService
             .Where(x => x.IsApproved)
             .ToListAsync();
 
-        var myBookings = await CountBySalonAsync(_context.Appointments.Where(x => x.CustomerId == customerId && x.StateName != "Cancelled").Select(x => x.SalonId));
-        var allBookings = await CountBySalonAsync(_context.Appointments.Where(x => x.StateName != "Cancelled").Select(x => x.SalonId));
+        var myBookings = await CountBySalonAsync(_context.Appointments.Where(x => x.CustomerId == customerId && x.StateName != AppointmentStateNames.Cancelled).Select(x => x.SalonId));
+        var allBookings = await CountBySalonAsync(_context.Appointments.Where(x => x.StateName != AppointmentStateNames.Cancelled).Select(x => x.SalonId));
         var myViews = await CountBySalonAsync(_context.SalonViews.Where(x => x.UserId == customerId).Select(x => x.SalonId));
         var favorites = (await _context.Favorites.Where(x => x.UserId == customerId).Select(x => x.SalonId).ToListAsync()).ToHashSet();
         var myRatings = await _context.Reviews.Where(x => x.CustomerId == customerId && !x.IsRemoved)

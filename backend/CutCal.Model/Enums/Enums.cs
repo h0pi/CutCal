@@ -23,11 +23,11 @@ public enum PaymentStatus
 
 public enum NotificationType
 {
+    AppointmentRequested,
     AppointmentConfirmed,
     AppointmentCancelled,
     AppointmentCompleted,
-    AppointmentReminder,
-    NewPromotion,
+    AppointmentRescheduled,
     PaymentReceived,
     PaymentRefunded
 }

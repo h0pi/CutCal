@@ -1,3 +1,4 @@
+using CutCal.Model.Constants;
 using CutCal.Model.Responses;
 using CutCal.Services.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -6,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace CutCal.WebAPI.Controllers;
 
 [ApiController]
-[Authorize(Roles = "Admin,SalonManager")]
+[Authorize(Roles = RoleNames.AdminOrManager)]
 [Route("[controller]")]
 public class GeocodingController : ControllerBase
 {

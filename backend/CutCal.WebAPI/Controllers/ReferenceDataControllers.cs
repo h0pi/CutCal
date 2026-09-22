@@ -1,3 +1,4 @@
+using CutCal.Model.Constants;
 using CutCal.Model.Requests;
 using CutCal.Model.Responses;
 using CutCal.Model.SearchObjects;
@@ -15,15 +16,15 @@ public class SalonCategoriesController : BaseCRUDController<SalonCategoryRespons
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = RoleNames.Admin)]
     public override Task<ActionResult<SalonCategoryResponse>> Insert([FromBody] SalonCategoryInsertRequest request) => base.Insert(request);
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = RoleNames.Admin)]
     public override Task<ActionResult<SalonCategoryResponse>> Update(int id, [FromBody] SalonCategoryUpdateRequest request) => base.Update(id, request);
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = RoleNames.Admin)]
     public override Task<IActionResult> Delete(int id) => base.Delete(id);
 }
 
@@ -34,14 +35,14 @@ public class CitiesController : BaseCRUDController<CityResponse, CitySearchObjec
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = RoleNames.Admin)]
     public override Task<ActionResult<CityResponse>> Insert([FromBody] CityInsertRequest request) => base.Insert(request);
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = RoleNames.Admin)]
     public override Task<ActionResult<CityResponse>> Update(int id, [FromBody] CityUpdateRequest request) => base.Update(id, request);
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = RoleNames.Admin)]
     public override Task<IActionResult> Delete(int id) => base.Delete(id);
 }

@@ -1,3 +1,4 @@
+using CutCal.Model.Constants;
 using CutCal.Model.Responses;
 using CutCal.Services.Auth;
 using CutCal.Services.Services;
@@ -7,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace CutCal.WebAPI.Controllers;
 
 [ApiController]
-[Authorize(Roles = "Customer")]
+[Authorize(Roles = RoleNames.Customer)]
 [Route("[controller]")]
 public class RecommendationsController : ControllerBase
 {

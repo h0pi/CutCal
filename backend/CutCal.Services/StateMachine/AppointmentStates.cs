@@ -1,3 +1,4 @@
+using CutCal.Model.Constants;
 using CutCal.Model.Exceptions;
 using CutCal.Services.Database;
 
@@ -25,44 +26,44 @@ public abstract class BaseAppointmentState
 
 public class PendingAppointmentState : BaseAppointmentState
 {
-    public override string Name => "Pending";
+    public override string Name => AppointmentStateNames.Pending;
 
     public override void Confirm(Appointment appointment, int managerId)
     {
-        appointment.StateName = "Confirmed";
+        appointment.StateName = AppointmentStateNames.Confirmed;
         appointment.ApprovedById = managerId;
         appointment.ApprovedAt = DateTime.UtcNow;
     }
 
     public override void Cancel(Appointment appointment, string reason)
     {
-        appointment.StateName = "Cancelled";
+        appointment.StateName = AppointmentStateNames.Cancelled;
         appointment.CancellationReason = reason;
     }
 }
 
 public class ConfirmedAppointmentState : BaseAppointmentState
 {
-    public override string Name => "Confirmed";
+    public override string Name => AppointmentStateNames.Confirmed;
 
     public override void Complete(Appointment appointment)
     {
-        appointment.StateName = "Completed";
+        appointment.StateName = AppointmentStateNames.Completed;
     }
 
     public override void Cancel(Appointment appointment, string reason)
     {
-        appointment.StateName = "Cancelled";
+        appointment.StateName = AppointmentStateNames.Cancelled;
         appointment.CancellationReason = reason;
     }
 }
 
 public class CompletedAppointmentState : BaseAppointmentState
 {
-    public override string Name => "Completed";
+    public override string Name => AppointmentStateNames.Completed;
 }
 
 public class CancelledAppointmentState : BaseAppointmentState
 {
-    public override string Name => "Cancelled";
+    public override string Name => AppointmentStateNames.Cancelled;
 }

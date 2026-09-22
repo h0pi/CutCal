@@ -1,3 +1,4 @@
+using CutCal.Model.Constants;
 using CutCal.Model.Common;
 using CutCal.Model.Requests;
 using CutCal.Model.Responses;
@@ -30,21 +31,21 @@ public class ReviewsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Customer")]
+    [Authorize(Roles = RoleNames.Customer)]
     public async Task<ActionResult<ReviewResponse>> Insert([FromBody] ReviewInsertRequest request)
     {
         return Ok(await _service.InsertAsync(request, _userAccessor.UserId));
     }
 
     [HttpPut("{id:int}/Reply")]
-    [Authorize(Roles = "Admin,SalonManager")]
+    [Authorize(Roles = RoleNames.AdminOrManager)]
     public async Task<ActionResult<ReviewResponse>> Reply(int id, [FromBody] ReviewReplyRequest request)
     {
         return Ok(await _service.ReplyAsync(id, request, _userAccessor.UserId));
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = RoleNames.Admin)]
     public async Task<IActionResult> Delete(int id)
     {
         await _service.RemoveAsync(id, _userAccessor.UserId);

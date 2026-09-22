@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace CutCal.WebAPI.Controllers;
 
-// TODO: replace polling with a SignalR NotificationHub for true real-time push.
+// Clients poll this endpoint (auto-refresh), which meets the notification requirement without a push hub.
 [ApiController]
 [Authorize]
 [Route("[controller]")]

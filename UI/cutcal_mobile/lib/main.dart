@@ -22,7 +22,6 @@ class CutCalApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => SalonProvider()),
         ChangeNotifierProvider(create: (_) => SalonCategoryProvider()),
-        ChangeNotifierProvider(create: (_) => CityProvider()),
         ChangeNotifierProvider(create: (_) => SalonServiceProvider()),
         ChangeNotifierProvider(create: (_) => StaffProvider()),
         ChangeNotifierProvider(create: (_) => AppointmentProvider()),

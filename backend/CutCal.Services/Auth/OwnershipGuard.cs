@@ -1,3 +1,4 @@
+using CutCal.Model.Constants;
 using CutCal.Model.Exceptions;
 using CutCal.Services.Database;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +13,7 @@ public static class OwnershipGuard
     /// </summary>
     public static async Task EnsureManagesSalonAsync(CutCalDbContext context, int salonId, IAuthenticatedUserAccessor user)
     {
-        if (user.IsInRole("Admin"))
+        if (user.IsInRole(RoleNames.Admin))
         {
             return;
         }

@@ -17,7 +17,7 @@ for (var i = 0; i < 5 && envDir is not null; i++)
 
 var builder = Host.CreateApplicationBuilder(args);
 
-builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddSingleton<IEmailService, EmailService>();
 builder.Services.AddHostedService<RabbitMqConsumerService>();
 
 var host = builder.Build();

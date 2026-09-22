@@ -1,3 +1,6 @@
+using CutCal.Messaging;
+using CutCal.Model.Constants;
+using CutCal.Model.Enums;
 using CutCal.Model.Exceptions;
 using CutCal.Model.Requests;
 using CutCal.Model.Responses;
@@ -25,19 +28,16 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
 {
     private readonly IRabbitMqPublisher _publisher;
     private readonly INotificationService _notificationService;
-    private readonly ISalonService _salonService;
     private readonly IAuthenticatedUserAccessor _userAccessor;
 
     public AppointmentService(
         CutCalDbContext context,
         IRabbitMqPublisher publisher,
         INotificationService notificationService,
-        ISalonService salonService,
         IAuthenticatedUserAccessor userAccessor) : base(context)
     {
         _publisher = publisher;
         _notificationService = notificationService;
-        _salonService = salonService;
         _userAccessor = userAccessor;
     }
 
@@ -56,15 +56,15 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
         // Appointments are private: a Customer only ever sees their own bookings, Staff only
         // their own assigned appointments, and a SalonManager only appointments at salons they own.
         // Admin is unrestricted.
-        if (_userAccessor.IsInRole("Customer"))
+        if (_userAccessor.IsInRole(RoleNames.Customer))
         {
             query = query.Where(x => x.CustomerId == _userAccessor.UserId);
         }
-        else if (_userAccessor.IsInRole("Staff"))
+        else if (_userAccessor.IsInRole(RoleNames.Staff))
         {
             query = query.Where(x => x.Staff.UserId == _userAccessor.UserId);
         }
-        else if (_userAccessor.IsInRole("SalonManager"))
+        else if (_userAccessor.IsInRole(RoleNames.SalonManager))
         {
             query = query.Where(x => x.Salon.OwnerId == _userAccessor.UserId);
         }
@@ -75,7 +75,7 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
     {
         // CustomerId is already forced to the caller's own id for the Customer role via
         // AddSecurityFilter, so an explicit filter value here is only meaningful for Admin/staff/manager.
-        if (search.CustomerId.HasValue && !_userAccessor.IsInRole("Customer"))
+        if (search.CustomerId.HasValue && !_userAccessor.IsInRole(RoleNames.Customer))
         {
             query = query.Where(x => x.CustomerId == search.CustomerId.Value);
         }
@@ -104,12 +104,24 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
 
     public static BaseAppointmentState GetState(string stateName) => stateName switch
     {
-        "Pending" => new PendingAppointmentState(),
-        "Confirmed" => new ConfirmedAppointmentState(),
-        "Completed" => new CompletedAppointmentState(),
-        "Cancelled" => new CancelledAppointmentState(),
+        AppointmentStateNames.Pending => new PendingAppointmentState(),
+        AppointmentStateNames.Confirmed => new ConfirmedAppointmentState(),
+        AppointmentStateNames.Completed => new CompletedAppointmentState(),
+        AppointmentStateNames.Cancelled => new CancelledAppointmentState(),
         _ => throw new ClientException($"Unknown appointment state '{stateName}'.")
     };
+
+    /// <summary>
+    /// Appointment times are the salon's wall-clock time and are compared with UTC, so a slot that is
+    /// less than the salon's UTC offset in the past is not caught here; everything earlier is.
+    /// </summary>
+    private static void EnsureNotInPast(DateTime scheduledAt)
+    {
+        if (scheduledAt < DateTime.UtcNow)
+        {
+            throw new ClientException("An appointment cannot be scheduled in the past.");
+        }
+    }
 
     /// <summary>
     /// Shared by InsertAsync and RescheduleAsync: the salon must be open at that time, and the
@@ -132,10 +144,11 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
         }
 
         var endsAt = scheduledAt.AddMinutes(durationMinutes);
+        var excludedId = excludeAppointmentId ?? 0;
         var overlapping = await Context.Appointments.AnyAsync(a =>
             a.StaffId == staffId &&
-            a.Id != (excludeAppointmentId ?? 0) &&
-            a.StateName != "Cancelled" &&
+            a.Id != excludedId &&
+            a.StateName != AppointmentStateNames.Cancelled &&
             a.ScheduledAt < endsAt &&
             scheduledAt < a.ScheduledAt.AddMinutes(a.DurationMinutes));
         if (overlapping)
@@ -144,68 +157,86 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
         }
     }
 
+    private static NotificationMessage BuildMessage(string type, Appointment appointment, string? reason = null) => new()
+    {
+        Type = type,
+        AppointmentId = appointment.Id,
+        CustomerEmail = appointment.Customer.Email,
+        CustomerName = appointment.Customer.FirstName,
+        SalonName = appointment.Salon.Name,
+        ScheduledAt = appointment.ScheduledAt,
+        Reason = reason
+    };
+
+    private async Task<Appointment> LoadForChangeAsync(int id)
+    {
+        return await Context.Appointments
+            .Include(x => x.Customer)
+            .Include(x => x.Salon).ThenInclude(s => s.WorkingHours)
+            .FirstOrDefaultAsync(x => x.Id == id)
+            ?? throw new ClientException("Appointment not found.");
+    }
+
     public async Task<AppointmentResponse> InsertAsync(AppointmentInsertRequest request, int customerId)
     {
+        EnsureNotInPast(request.ScheduledAt);
+
         var salon = await Context.Salons.Include(x => x.WorkingHours).FirstOrDefaultAsync(x => x.Id == request.SalonId)
             ?? throw new ClientException("Salon not found.");
         var service = await Context.SalonServices.FirstOrDefaultAsync(x => x.Id == request.ServiceId && x.SalonId == request.SalonId)
             ?? throw new ClientException("Service not found for this salon.");
         var staff = await Context.Staff.FirstOrDefaultAsync(x => x.Id == request.StaffId && x.SalonId == request.SalonId)
             ?? throw new ClientException("Staff member not found for this salon.");
+        var customer = await Context.Users.FirstOrDefaultAsync(x => x.Id == customerId)
+            ?? throw new ClientException("Customer not found.");
 
         await ValidateSlotAvailableAsync(salon, service.DurationMinutes, request.StaffId, request.ScheduledAt, excludeAppointmentId: null);
 
+        var confirmed = salon.AutoConfirm;
         var appointment = new Appointment
         {
-            CustomerId = customerId,
-            SalonId = request.SalonId,
-            StaffId = request.StaffId,
-            ServiceId = request.ServiceId,
+            Customer = customer,
+            Salon = salon,
+            StaffId = staff.Id,
+            ServiceId = service.Id,
             ScheduledAt = request.ScheduledAt,
             DurationMinutes = service.DurationMinutes,
             Price = service.Price,
             PaymentMethod = request.PaymentMethod,
-            PaymentStatus = "Unpaid",
-            StateName = salon.AutoConfirm ? "Confirmed" : "Pending",
+            PaymentStatus = PaymentStatusNames.Unpaid,
+            StateName = confirmed ? AppointmentStateNames.Confirmed : AppointmentStateNames.Pending,
             CreatedAt = DateTime.UtcNow
         };
-        if (salon.AutoConfirm)
+        if (confirmed)
         {
             appointment.ApprovedById = salon.OwnerId;
             appointment.ApprovedAt = DateTime.UtcNow;
         }
 
         Context.Appointments.Add(appointment);
+        _notificationService.Add(customerId,
+            confirmed ? "Appointment confirmed" : "Appointment requested",
+            $"Your appointment at {salon.Name} on {appointment.ScheduledAt:g} is {appointment.StateName}.",
+            confirmed ? nameof(NotificationType.AppointmentConfirmed) : nameof(NotificationType.AppointmentRequested));
+
+        // One SaveChanges: the appointment and its notification are stored together or not at all.
         await Context.SaveChangesAsync();
 
-        await _notificationService.CreateAsync(customerId,
-            appointment.StateName == "Confirmed" ? "Appointment confirmed" : "Appointment requested",
-            $"Your appointment at {salon.Name} on {appointment.ScheduledAt:g} is {appointment.StateName}.",
-            appointment.StateName == "Confirmed" ? "AppointmentConfirmed" : "AppointmentConfirmed");
-
-        await _publisher.PublishAsync("appointment.created", new
-        {
-            Type = "AppointmentConfirmed",
-            appointment.Id,
-            CustomerEmail = (await Context.Users.FindAsync(customerId))?.Email,
-            SalonName = salon.Name,
-            appointment.ScheduledAt
-        });
+        await _publisher.PublishAsync(BuildMessage(confirmed ? NotificationMessageTypes.AppointmentConfirmed : NotificationMessageTypes.AppointmentRequested, appointment));
 
         return await GetByIdAsync(appointment.Id) ?? appointment.Adapt<AppointmentResponse>();
     }
 
     public async Task<AppointmentResponse> ConfirmAsync(int id, int managerId)
     {
-        var appointment = await Context.Appointments.Include(x => x.Salon).FirstOrDefaultAsync(x => x.Id == id)
-            ?? throw new ClientException("Appointment not found.");
-        var state = GetState(appointment.StateName);
-        state.Confirm(appointment, managerId);
+        var appointment = await LoadForChangeAsync(id);
+        GetState(appointment.StateName).Confirm(appointment, managerId);
+
+        _notificationService.Add(appointment.CustomerId, "Appointment confirmed",
+            $"Your appointment at {appointment.Salon.Name} on {appointment.ScheduledAt:g} has been confirmed.", nameof(NotificationType.AppointmentConfirmed));
         await Context.SaveChangesAsync();
 
-        await _notificationService.CreateAsync(appointment.CustomerId, "Appointment confirmed",
-            $"Your appointment at {appointment.Salon.Name} on {appointment.ScheduledAt:g} has been confirmed.", "AppointmentConfirmed");
-        await _publisher.PublishAsync("appointment.confirmed", new { Type = "AppointmentConfirmed", appointment.Id });
+        await _publisher.PublishAsync(BuildMessage(NotificationMessageTypes.AppointmentConfirmed, appointment));
 
         return await GetByIdAsync(id) ?? appointment.Adapt<AppointmentResponse>();
     }
@@ -217,44 +248,41 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
             throw new ClientException("Cancellation reason is required.");
         }
 
-        var appointment = await Context.Appointments.Include(x => x.Salon).FirstOrDefaultAsync(x => x.Id == id)
-            ?? throw new ClientException("Appointment not found.");
-        var state = GetState(appointment.StateName);
-        state.Cancel(appointment, reason);
+        var appointment = await LoadForChangeAsync(id);
+        GetState(appointment.StateName).Cancel(appointment, reason);
+
+        _notificationService.Add(appointment.CustomerId, "Appointment cancelled",
+            $"Your appointment at {appointment.Salon.Name} on {appointment.ScheduledAt:g} was cancelled. Reason: {reason}", nameof(NotificationType.AppointmentCancelled));
         await Context.SaveChangesAsync();
 
-        await _notificationService.CreateAsync(appointment.CustomerId, "Appointment cancelled",
-            $"Your appointment at {appointment.Salon.Name} on {appointment.ScheduledAt:g} was cancelled. Reason: {reason}", "AppointmentCancelled");
-        await _publisher.PublishAsync("appointment.cancelled", new { Type = "AppointmentCancelled", appointment.Id, Reason = reason });
+        await _publisher.PublishAsync(BuildMessage(NotificationMessageTypes.AppointmentCancelled, appointment, reason));
 
         return await GetByIdAsync(id) ?? appointment.Adapt<AppointmentResponse>();
     }
 
     public async Task<AppointmentResponse> CompleteAsync(int id)
     {
-        var appointment = await Context.Appointments.Include(x => x.Salon).FirstOrDefaultAsync(x => x.Id == id)
-            ?? throw new ClientException("Appointment not found.");
-        var state = GetState(appointment.StateName);
-        state.Complete(appointment);
-        await Context.SaveChangesAsync();
+        var appointment = await LoadForChangeAsync(id);
+        GetState(appointment.StateName).Complete(appointment);
 
-        await _notificationService.CreateAsync(appointment.CustomerId, "Appointment completed",
+        _notificationService.Add(appointment.CustomerId, "Appointment completed",
             $"Your appointment at {appointment.Salon.Name} on {appointment.ScheduledAt:g} is now complete. Feel free to leave a review!",
-            nameof(CutCal.Model.Enums.NotificationType.AppointmentCompleted));
+            nameof(NotificationType.AppointmentCompleted));
+        await Context.SaveChangesAsync();
 
         return await GetByIdAsync(id) ?? appointment.Adapt<AppointmentResponse>();
     }
 
     public async Task<AppointmentResponse> RescheduleAsync(int id, DateTime newScheduledAt, int customerId)
     {
-        var appointment = await Context.Appointments.Include(x => x.Salon).ThenInclude(s => s.WorkingHours).FirstOrDefaultAsync(x => x.Id == id)
-            ?? throw new ClientException("Appointment not found.");
+        EnsureNotInPast(newScheduledAt);
 
+        var appointment = await LoadForChangeAsync(id);
         if (appointment.CustomerId != customerId)
         {
             throw new ClientException("You can only reschedule your own appointments.");
         }
-        if (appointment.StateName is not ("Pending" or "Confirmed"))
+        if (appointment.StateName is not (AppointmentStateNames.Pending or AppointmentStateNames.Confirmed))
         {
             throw new ClientException($"An appointment in state '{appointment.StateName}' cannot be rescheduled.");
         }
@@ -262,11 +290,11 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
         await ValidateSlotAvailableAsync(appointment.Salon, appointment.DurationMinutes, appointment.StaffId, newScheduledAt, excludeAppointmentId: id);
 
         appointment.ScheduledAt = newScheduledAt;
+        _notificationService.Add(appointment.CustomerId, "Appointment rescheduled",
+            $"Your appointment at {appointment.Salon.Name} was moved to {newScheduledAt:g}.", nameof(NotificationType.AppointmentRescheduled));
         await Context.SaveChangesAsync();
 
-        await _notificationService.CreateAsync(appointment.CustomerId, "Appointment rescheduled",
-            $"Your appointment at {appointment.Salon.Name} was moved to {newScheduledAt:g}.",
-            nameof(CutCal.Model.Enums.NotificationType.AppointmentConfirmed));
+        await _publisher.PublishAsync(BuildMessage(NotificationMessageTypes.AppointmentRescheduled, appointment));
 
         return await GetByIdAsync(id) ?? appointment.Adapt<AppointmentResponse>();
     }

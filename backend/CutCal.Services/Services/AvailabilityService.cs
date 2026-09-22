@@ -1,3 +1,4 @@
+using CutCal.Model.Constants;
 using CutCal.Model.Exceptions;
 using CutCal.Model.Responses;
 using CutCal.Services.Database;
@@ -98,7 +99,7 @@ public class AvailabilityService : IAvailabilityService
         var excludedId = excludeAppointmentId ?? 0;
         var bookings = await _context.Appointments.AsNoTracking()
             .Where(a => staffIds.Contains(a.StaffId)
-                && a.StateName != "Cancelled"
+                && a.StateName != AppointmentStateNames.Cancelled
                 && a.Id != excludedId
                 && a.ScheduledAt >= lookBehind
                 && a.ScheduledAt < rangeEnd)

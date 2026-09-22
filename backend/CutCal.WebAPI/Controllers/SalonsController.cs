@@ -1,3 +1,4 @@
+using CutCal.Model.Constants;
 using CutCal.Model.Requests;
 using CutCal.Model.Responses;
 using CutCal.Model.SearchObjects;
@@ -28,14 +29,14 @@ public class SalonsController : BaseCRUDController<SalonResponse, SalonSearchObj
     }
 
     [HttpPost("{id:int}/Approve")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = RoleNames.Admin)]
     public async Task<ActionResult<SalonResponse>> Approve(int id)
     {
         return Ok(await Service.ApproveAsync(id));
     }
 
     [HttpPost("{id:int}/View")]
-    [Authorize(Roles = "Customer")]
+    [Authorize(Roles = RoleNames.Customer)]
     public async Task<IActionResult> LogView(int id)
     {
         await Service.LogViewAsync(_userAccessor.UserId, id);
@@ -49,21 +50,21 @@ public class SalonsController : BaseCRUDController<SalonResponse, SalonSearchObj
     }
 
     [HttpPost("{id:int}/Gallery")]
-    [Authorize(Roles = "Admin,SalonManager")]
+    [Authorize(Roles = RoleNames.AdminOrManager)]
     public async Task<ActionResult<SalonGalleryResponse>> AddGalleryImage(int id, [FromBody] SalonGalleryInsertRequest request)
     {
         return Ok(await Service.AddGalleryImageAsync(id, request));
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin,SalonManager")]
+    [Authorize(Roles = RoleNames.AdminOrManager)]
     public override Task<ActionResult<SalonResponse>> Insert([FromBody] SalonInsertRequest request) => base.Insert(request);
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = "Admin,SalonManager")]
+    [Authorize(Roles = RoleNames.AdminOrManager)]
     public override Task<ActionResult<SalonResponse>> Update(int id, [FromBody] SalonUpdateRequest request) => base.Update(id, request);
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = RoleNames.Admin)]
     public override Task<IActionResult> Delete(int id) => base.Delete(id);
 }

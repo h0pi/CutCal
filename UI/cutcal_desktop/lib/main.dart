@@ -25,7 +25,6 @@ class CutCalDesktopApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => StaffProvider()),
         ChangeNotifierProvider(create: (_) => AppointmentProvider()),
         ChangeNotifierProvider(create: (_) => ReviewProvider()),
-        ChangeNotifierProvider(create: (_) => NotificationProvider()),
         ChangeNotifierProvider(create: (_) => UserProvider()),
         Provider(create: (_) => ReportProvider()),
         Provider(create: (_) => GeocodingProvider()),

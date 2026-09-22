@@ -43,6 +43,7 @@ builder.Services.AddScoped<IAuthenticatedUserAccessor, HttpAuthenticatedUserAcce
 builder.Services.AddControllers(options =>
 {
     options.Filters.Add<ExceptionFilter>();
+    options.Filters.Add<ValidationFilter>();
 });
 
 // 4. DbContext
@@ -131,7 +132,6 @@ builder.Services.AddCors(options =>
 });
 
 // 10. OpenApi + Swagger with JWT bearer scheme
-builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -164,11 +164,6 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<CutCalDbContext>();
     await db.Database.MigrateAsync();
     await DemoDataSeeder.EnsureUpcomingAppointmentsAsync(db, scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(nameof(DemoDataSeeder)));
-}
-
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
 }
 
 app.UseSwagger();

@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\CutCal.Model\CutCal.Model.csproj" />
     <ProjectReference Include="..\CutCal.Common.Services\CutCal.Common.Services.csproj" />
+    <ProjectReference Include="..\CutCal.Messaging\CutCal.Messaging.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -18,7 +19,6 @@
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.9" />
     <PackageReference Include="PayPalCheckoutSdk" Version="1.0.4" />
     <PackageReference Include="QuestPDF" Version="2026.7.0" />
-    <PackageReference Include="RabbitMQ.Client" Version="7.2.1" />
   </ItemGroup>
 
   <PropertyGroup>

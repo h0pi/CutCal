@@ -1,5 +1,5 @@
-using System.Text;
 using System.Text.Json;
+using CutCal.Messaging;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 
@@ -7,55 +7,98 @@ namespace CutCal.Services.Messaging;
 
 public interface IRabbitMqPublisher
 {
-    Task PublishAsync<T>(string routingKey, T message);
+    /// <summary>Publishes an e-mail notification. Never throws: a broken broker must not fail the user's booking.</summary>
+    Task PublishAsync(NotificationMessage message);
 }
 
+/// <summary>
+/// Publishes through one shared connection (never a new connection per message). If the connection is
+/// lost, or the broker was down at start-up, the next publish opens a new one.
+/// </summary>
 public class RabbitMqPublisher : IRabbitMqPublisher, IAsyncDisposable
 {
-    private const string ExchangeName = "cutcal.notifications";
     private readonly ILogger<RabbitMqPublisher> _logger;
-    private readonly Task<IConnection> _connectionTask;
     private readonly ConnectionFactory _factory;
+    private readonly SemaphoreSlim _connectionLock = new(1, 1);
+    private IConnection? _connection;
 
     public RabbitMqPublisher(ILogger<RabbitMqPublisher> logger)
     {
         _logger = logger;
+        var settings = RabbitMqSettings.FromEnvironment();
         _factory = new ConnectionFactory
         {
-            HostName = Environment.GetEnvironmentVariable("RabbitMQ__Host") ?? "localhost",
-            Port = int.TryParse(Environment.GetEnvironmentVariable("RabbitMQ__Port"), out var port) ? port : 5672,
-            UserName = Environment.GetEnvironmentVariable("RabbitMQ__Username") ?? "guest",
-            Password = Environment.GetEnvironmentVariable("RabbitMQ__Password") ?? "guest"
+            HostName = settings.Host,
+            Port = settings.Port,
+            UserName = settings.Username,
+            Password = settings.Password
         };
-        _connectionTask = _factory.CreateConnectionAsync();
     }
 
-    public async Task PublishAsync<T>(string routingKey, T message)
+    public async Task PublishAsync(NotificationMessage message)
     {
         try
         {
-            var connection = await _connectionTask;
+            var connection = await GetConnectionAsync();
             await using var channel = await connection.CreateChannelAsync();
-            await channel.ExchangeDeclareAsync(ExchangeName, ExchangeType.Direct, durable: true);
-            await channel.QueueDeclareAsync(ExchangeName, durable: true, exclusive: false, autoDelete: false);
-            await channel.QueueBindAsync(ExchangeName, ExchangeName, routingKey);
 
-            var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(message));
-            var props = new BasicProperties { Persistent = true, Type = routingKey };
-            await channel.BasicPublishAsync(ExchangeName, routingKey, mandatory: false, props, body);
+            var properties = new BasicProperties
+            {
+                Persistent = true,
+                ContentType = "application/json",
+                Type = message.Type
+            };
+            await channel.BasicPublishAsync(MessagingTopology.ExchangeName, message.Type, mandatory: false, properties, JsonSerializer.SerializeToUtf8Bytes(message));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to publish RabbitMQ message with routing key {RoutingKey}", routingKey);
+            _logger.LogError(ex, "Could not publish {MessageType} for appointment {AppointmentId}; the customer will not get this e-mail.", message.Type, message.AppointmentId);
+        }
+    }
+
+    private async Task<IConnection> GetConnectionAsync()
+    {
+        if (_connection is { IsOpen: true })
+        {
+            return _connection;
+        }
+
+        await _connectionLock.WaitAsync();
+        try
+        {
+            if (_connection is { IsOpen: true })
+            {
+                return _connection;
+            }
+
+            if (_connection is not null)
+            {
+                await _connection.DisposeAsync();
+            }
+
+            var connection = await _factory.CreateConnectionAsync();
+
+            // Declare exchange and queues once per connection, so messages are kept even if the worker is not running yet.
+            await using (var channel = await connection.CreateChannelAsync())
+            {
+                await MessagingTopology.DeclareAsync(channel);
+            }
+
+            _connection = connection;
+            return connection;
+        }
+        finally
+        {
+            _connectionLock.Release();
         }
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (_connectionTask.IsCompletedSuccessfully)
+        if (_connection is not null)
         {
-            var connection = await _connectionTask;
-            await connection.DisposeAsync();
+            await _connection.DisposeAsync();
         }
+        _connectionLock.Dispose();
     }
 }

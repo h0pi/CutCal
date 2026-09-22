@@ -1,3 +1,4 @@
+using CutCal.Model.Constants;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -102,15 +103,15 @@ public class AccessManager : IAccessManager
             IsActive = true,
             CreatedAt = DateTime.UtcNow
         };
+
+        // Self-registration always creates a Customer; the client can never choose a role.
+        var customerRole = await _context.Roles.FirstOrDefaultAsync(x => x.Name == RoleNames.Customer)
+            ?? throw new ClientException("Default Customer role is not configured.");
+        user.UserRoles.Add(new UserRole { Role = customerRole });
+
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
 
-        var customerRole = await _context.Roles.FirstOrDefaultAsync(x => x.Name == "Customer")
-            ?? throw new ClientException("Default Customer role is not configured.");
-        _context.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = customerRole.Id });
-        await _context.SaveChangesAsync();
-
-        user.UserRoles = new List<UserRole> { new() { UserId = user.Id, RoleId = customerRole.Id, Role = customerRole } };
         return user.Adapt<UserResponse>();
     }
 
@@ -140,7 +141,7 @@ public class AccessManager : IAccessManager
     private async Task<LoginResponse> BuildLoginResponseAsync(User user)
     {
         var roles = user.UserRoles.Select(ur => ur.Role.Name).ToList();
-        var primaryRole = roles.FirstOrDefault() ?? "Customer";
+        var primaryRole = roles.FirstOrDefault() ?? RoleNames.Customer;
 
         var claims = new List<Claim>
         {

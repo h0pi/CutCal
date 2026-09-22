@@ -1,3 +1,4 @@
+using CutCal.Model.Constants;
 using Microsoft.EntityFrameworkCore;
 
 namespace CutCal.Services.Database;
@@ -16,10 +17,10 @@ public static class CutCalSeed
         var seedDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
         modelBuilder.Entity<Role>().HasData(
-            new Role { Id = 1, Name = "Customer" },
-            new Role { Id = 2, Name = "Staff" },
-            new Role { Id = 3, Name = "SalonManager" },
-            new Role { Id = 4, Name = "Admin" }
+            new Role { Id = 1, Name = RoleNames.Customer },
+            new Role { Id = 2, Name = RoleNames.Staff },
+            new Role { Id = 3, Name = RoleNames.SalonManager },
+            new Role { Id = 4, Name = RoleNames.Admin }
         );
 
         modelBuilder.Entity<SalonCategory>().HasData(
@@ -260,8 +261,8 @@ public static class CutCalSeed
         var appointments = new List<Appointment>();
         Appointment NewAppointment(int id, int salonId, int staffId, SalonService service, int customerId, DateTime scheduledAt, string state, string paymentMethod)
         {
-            var completed = state == "Completed";
-            var cancelled = state == "Cancelled";
+            var completed = state == AppointmentStateNames.Completed;
+            var cancelled = state == AppointmentStateNames.Cancelled;
             return new Appointment
             {
                 Id = id,
@@ -274,7 +275,7 @@ public static class CutCalSeed
                 Price = service.Price,
                 StateName = state,
                 PaymentMethod = paymentMethod,
-                PaymentStatus = completed ? "Paid" : "Unpaid",
+                PaymentStatus = completed ? PaymentStatusNames.Paid : PaymentStatusNames.Unpaid,
                 ApprovedById = cancelled ? null : salonSeeds[salonId - 1].OwnerId,
                 ApprovedAt = cancelled ? null : scheduledAt.AddDays(-1),
                 CancellationReason = cancelled ? "Customer requested cancellation." : null,
@@ -291,7 +292,7 @@ public static class CutCalSeed
             var salonServiceList = salonServices[salonId];
             appointments.Add(NewAppointment(
                 i + 1, salonId, staffIds[i % staffIds.Length], salonServiceList[i % salonServiceList.Count],
-                customerPool[i % 5], seedDate.AddDays(i - 10).AddHours(10 + i % 6), i < 17 ? "Completed" : "Cancelled", i % 2 == 0 ? "Cash" : "PayPal"));
+                customerPool[i % 5], seedDate.AddDays(i - 10).AddHours(10 + i % 6), i < 17 ? AppointmentStateNames.Completed : AppointmentStateNames.Cancelled, i % 2 == 0 ? PaymentMethodNames.Cash : PaymentMethodNames.PayPal));
         }
 
         // Booking history for every salon (ids 101+): 8 completed visits and 1 cancellation each.
@@ -310,7 +311,7 @@ public static class CutCalSeed
                 var isCancelled = j == visitsPerSalon;
                 var appointment = NewAppointment(
                     historyId++, salon.Id, staffIds[j % staffIds.Length], salonServiceList[j % salonServiceList.Count],
-                    customerPool[(salon.Id + j * 3) % customerPool.Length], scheduledAt, isCancelled ? "Cancelled" : "Completed", j % 2 == 0 ? "Cash" : "PayPal");
+                    customerPool[(salon.Id + j * 3) % customerPool.Length], scheduledAt, isCancelled ? AppointmentStateNames.Cancelled : AppointmentStateNames.Completed, j % 2 == 0 ? PaymentMethodNames.Cash : PaymentMethodNames.PayPal);
                 appointments.Add(appointment);
                 if (!isCancelled && (j + salon.Id) % 3 != 0) reviewedHistory.Add(appointment);
             }
