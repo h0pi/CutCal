@@ -5,7 +5,9 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/entity_providers.dart';
+import '../../utils/api_client_exception.dart';
 import '../../utils/utils_widgets.dart';
 
 class AppointmentsScreen extends StatefulWidget {
@@ -102,6 +104,51 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     _load();
   }
 
+  Future<void> _reassignStaff(AppointmentModel a) async {
+    final staffResult = await context.read<StaffProvider>().get(filter: {
+      'salonId': a.salonId,
+      'isActive': true,
+      'pageSize': 100,
+    });
+    if (!mounted) return;
+    if (staffResult.items.isEmpty) {
+      showErrorSnackBar(context, 'This salon has no active staff members to reassign to.');
+      return;
+    }
+
+    var selectedStaffId = a.staffId;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Reassign staff'),
+          content: DropdownButtonFormField<int>(
+            initialValue: selectedStaffId,
+            decoration: const InputDecoration(labelText: 'Staff member', border: OutlineInputBorder()),
+            items: staffResult.items
+                .map((s) => DropdownMenuItem(value: s.id, child: Text(s.fullName ?? 'Staff #${s.id}')))
+                .toList(),
+            onChanged: (v) => setDialogState(() => selectedStaffId = v ?? selectedStaffId),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Back')),
+            FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Reassign')),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || selectedStaffId == a.staffId) return;
+
+    try {
+      await context.read<AppointmentProvider>().reassignStaff(a.id, selectedStaffId);
+      if (!mounted) return;
+      showSuccessSnackBar(context, 'Appointment reassigned.');
+      _load();
+    } on ApiClientException catch (e) {
+      if (mounted) showErrorSnackBar(context, e.message);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -163,6 +210,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                         DataColumn(label: Text('Customer')),
                         DataColumn(label: Text('Salon')),
                         DataColumn(label: Text('Service')),
+                        DataColumn(label: Text('Staff')),
                         DataColumn(label: Text('Date')),
                         DataColumn(label: Text('Status')),
                         DataColumn(label: Text('Price')),
@@ -173,6 +221,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                                 DataCell(Text(a.customerName ?? '')),
                                 DataCell(Text(a.salonName ?? '')),
                                 DataCell(Text(a.serviceName ?? '')),
+                                DataCell(Text(a.staffName ?? '—')),
                                 DataCell(Text(DateFormat('MMM d, HH:mm').format(a.scheduledAt))),
                                 DataCell(StatusBadge(status: a.stateName)),
                                 DataCell(Text('\$${a.price.toStringAsFixed(2)}')),
@@ -202,11 +251,15 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
   }
 
   Widget _actionsFor(AppointmentModel a) {
+    // Confirm and Reassign are Admin/SalonManager-only on the backend; a Staff
+    // login would just get a 403, so those two are hidden for that role here.
+    final canManage = context.read<AuthProvider>().role != 'Staff';
     return PopupMenuButton<String>(
-      onSelected: (action) => _changeStatus(a, action),
+      onSelected: (action) => action == 'Reassign' ? _reassignStaff(a) : _changeStatus(a, action),
       itemBuilder: (context) => [
-        if (a.stateName == 'Pending') const PopupMenuItem(value: 'Confirm', child: Text('Confirm')),
+        if (canManage && a.stateName == 'Pending') const PopupMenuItem(value: 'Confirm', child: Text('Confirm')),
         if (a.stateName == 'Confirmed') const PopupMenuItem(value: 'Complete', child: Text('Complete')),
+        if (canManage && (a.stateName == 'Pending' || a.stateName == 'Confirmed')) const PopupMenuItem(value: 'Reassign', child: Text('Reassign staff')),
         if (a.stateName == 'Pending' || a.stateName == 'Confirmed') const PopupMenuItem(value: 'Cancel', child: Text('Cancel')),
       ],
     );

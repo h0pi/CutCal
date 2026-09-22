@@ -22,6 +22,7 @@ public interface IAppointmentService : IBaseReadService<AppointmentResponse, App
     Task<AppointmentResponse> CancelAsync(int id, string reason, int userId);
     Task<AppointmentResponse> CompleteAsync(int id);
     Task<AppointmentResponse> RescheduleAsync(int id, DateTime newScheduledAt, int customerId);
+    Task<AppointmentResponse> ReassignStaffAsync(int id, int staffId);
 }
 
 public class AppointmentService : BaseReadService<Appointment, AppointmentResponse, AppointmentSearchObject>, IAppointmentService
@@ -295,6 +296,27 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
         await Context.SaveChangesAsync();
 
         await _publisher.PublishAsync(BuildMessage(NotificationMessageTypes.AppointmentRescheduled, appointment));
+
+        return await GetByIdAsync(id) ?? appointment.Adapt<AppointmentResponse>();
+    }
+
+    public async Task<AppointmentResponse> ReassignStaffAsync(int id, int staffId)
+    {
+        var appointment = await LoadForChangeAsync(id);
+        await OwnershipGuard.EnsureManagesSalonAsync(Context, appointment.SalonId, _userAccessor);
+
+        if (appointment.StateName is not (AppointmentStateNames.Pending or AppointmentStateNames.Confirmed))
+        {
+            throw new ClientException($"An appointment in state '{appointment.StateName}' cannot be reassigned.");
+        }
+
+        _ = await Context.Staff.FirstOrDefaultAsync(x => x.Id == staffId && x.SalonId == appointment.SalonId)
+            ?? throw new ClientException("Staff member not found for this salon.");
+
+        await ValidateSlotAvailableAsync(appointment.Salon, appointment.DurationMinutes, staffId, appointment.ScheduledAt, excludeAppointmentId: id);
+
+        appointment.StaffId = staffId;
+        await Context.SaveChangesAsync();
 
         return await GetByIdAsync(id) ?? appointment.Adapt<AppointmentResponse>();
     }

@@ -120,6 +120,13 @@ class AppointmentProvider extends BaseProvider<AppointmentModel> {
     final data = validateResponse(response);
     return fromJson(data);
   }
+
+  Future<AppointmentModel> reassignStaff(int id, int staffId) async {
+    final uri = Uri.parse('${AuthProvider.baseUrl}Appointments/$id/ReassignStaff');
+    final response = await http.put(uri, headers: createHeaders(), body: jsonEncode({'staffId': staffId}));
+    final data = validateResponse(response);
+    return fromJson(data);
+  }
 }
 
 class ReviewProvider extends BaseProvider<ReviewModel> {

@@ -180,6 +180,11 @@ public class AppointmentCancelRequest
     public string Reason { get; set; } = null!;
 }
 
+public class AppointmentReassignStaffRequest
+{
+    public int StaffId { get; set; }
+}
+
 public class ReviewInsertRequest
 {
     public int AppointmentId { get; set; }

@@ -278,3 +278,8 @@ public class AppointmentCancelRequestValidator : AbstractValidator<AppointmentCa
 {
     public AppointmentCancelRequestValidator() => RuleFor(x => x.Reason).RequiredName("Cancellation reason", Rules.TextMaxLength);
 }
+
+public class AppointmentReassignStaffRequestValidator : AbstractValidator<AppointmentReassignStaffRequest>
+{
+    public AppointmentReassignStaffRequestValidator() => RuleFor(x => x.StaffId).GreaterThan(0).WithMessage("Select a staff member.");
+}

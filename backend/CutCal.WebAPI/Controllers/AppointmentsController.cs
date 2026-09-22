@@ -70,4 +70,11 @@ public class AppointmentsController : ControllerBase
     {
         return Ok(await _service.RescheduleAsync(id, request.ScheduledAt, _userAccessor.UserId));
     }
+
+    [HttpPut("{id:int}/ReassignStaff")]
+    [Authorize(Roles = RoleNames.AdminOrManager)]
+    public async Task<ActionResult<AppointmentResponse>> ReassignStaff(int id, [FromBody] AppointmentReassignStaffRequest request)
+    {
+        return Ok(await _service.ReassignStaffAsync(id, request.StaffId));
+    }
 }

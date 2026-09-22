@@ -37,7 +37,7 @@ class _MasterScreenState extends State<MasterScreen> {
   static const double _collapsedWidth = 72;
   static const double _expandedWidth = 240;
 
-  final List<_NavItem> _items = const [
+  static const _adminItems = [
     _NavItem('Dashboard', Icons.dashboard, DashboardScreen()),
     _NavItem('Appointments', Icons.event_note, AppointmentsScreen()),
     _NavItem('Services', Icons.design_services, ServicesScreen()),
@@ -50,6 +50,15 @@ class _MasterScreenState extends State<MasterScreen> {
     _NavItem('Cities', Icons.location_city, CitiesScreen()),
     _NavItem('Settings', Icons.settings, SettingsScreen()),
   ];
+
+  // A staff login only ever needs to see the appointments assigned to them; the
+  // backend already scopes Appointments/Get to the caller's own bookings for the
+  // Staff role, so reusing the same screen here is enough — no separate widget.
+  static const _staffItems = [
+    _NavItem('My Appointments', Icons.event_note, AppointmentsScreen()),
+  ];
+
+  List<_NavItem> get _items => context.read<AuthProvider>().role == 'Staff' ? _staffItems : _adminItems;
 
   @override
   Widget build(BuildContext context) {
