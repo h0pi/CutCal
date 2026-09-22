@@ -88,6 +88,13 @@ class SalonProvider extends BaseProvider<SalonModel> {
     final response = await http.delete(uri, headers: createHeaders());
     validateResponse(response, allowEmpty: true);
   }
+
+  Future<SalonModel> setFeatured(int salonId, bool featured) async {
+    final uri = Uri.parse('${AuthProvider.baseUrl}Salons/$salonId/Feature');
+    final response = await http.post(uri, headers: createHeaders(), body: jsonEncode({'featured': featured}));
+    final data = validateResponse(response);
+    return fromJson(data);
+  }
 }
 
 class SalonServiceProvider extends BaseProvider<SalonServiceModel> {

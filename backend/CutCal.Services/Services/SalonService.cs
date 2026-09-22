@@ -15,6 +15,7 @@ namespace CutCal.Services.Services;
 public interface ISalonService : IBaseCRUDService<SalonResponse, SalonSearchObject, SalonInsertRequest, SalonUpdateRequest>
 {
     Task<SalonResponse> ApproveAsync(int id);
+    Task<SalonResponse> SetFeaturedAsync(int id, bool featured);
     Task<List<SalonGalleryResponse>> GetGalleryAsync(int salonId);
     Task<SalonGalleryResponse> AddGalleryImageAsync(int salonId, SalonGalleryInsertRequest request);
     Task RemoveGalleryImageAsync(int salonId, int imageId);
@@ -146,6 +147,16 @@ public class SalonManagementService : BaseCRUDService<Salon, SalonResponse, Salo
     {
         var salon = await GetEntityByIdAsync(id) ?? throw new ClientException("Salon not found.");
         salon.IsApproved = true;
+        await Context.SaveChangesAsync();
+        return salon.Adapt<SalonResponse>();
+    }
+
+    // Admin-only (enforced by the controller): a manager featuring their own salon would
+    // defeat the point of it being a curated signal, so this is never exposed to them.
+    public async Task<SalonResponse> SetFeaturedAsync(int id, bool featured)
+    {
+        var salon = await GetEntityByIdAsync(id) ?? throw new ClientException("Salon not found.");
+        salon.IsFeatured = featured;
         await Context.SaveChangesAsync();
         return salon.Adapt<SalonResponse>();
     }

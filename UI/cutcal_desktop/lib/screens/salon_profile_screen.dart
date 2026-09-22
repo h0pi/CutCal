@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
+import '../providers/auth_provider.dart';
 import '../providers/entity_providers.dart';
 import '../utils/api_client_exception.dart';
 import '../utils/utils_widgets.dart';
@@ -198,6 +199,22 @@ class _SalonProfileScreenState extends State<SalonProfileScreen> {
     }
   }
 
+  Future<void> _toggleFeatured(bool value) async {
+    final salon = _selectedSalon;
+    if (salon == null) return;
+    try {
+      final updated = await context.read<SalonProvider>().setFeatured(salon.id, value);
+      if (!mounted) return;
+      setState(() {
+        _selectedSalon = updated;
+        _salons = _salons.map((s) => s.id == updated.id ? updated : s).toList();
+      });
+      showSuccessSnackBar(context, value ? 'Salon is now featured.' : 'Salon is no longer featured.');
+    } on ApiClientException catch (e) {
+      if (mounted) showErrorSnackBar(context, e.message);
+    }
+  }
+
   Future<void> _removeGalleryImage(SalonGalleryModel image) async {
     if (_selectedSalon == null) return;
     final confirmed = await showConfirmationDialog(context, title: 'Remove image', message: 'Remove this image from the gallery?');
@@ -232,6 +249,16 @@ class _SalonProfileScreenState extends State<SalonProfileScreen> {
               if (v != null) _selectSalon(v);
             },
           ),
+          if (context.watch<AuthProvider>().role == 'Admin') ...[
+            const SizedBox(height: 8),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Featured salon'),
+              subtitle: const Text('Shown as promoted on the mobile app\'s home page.'),
+              value: _selectedSalon!.isFeatured,
+              onChanged: _toggleFeatured,
+            ),
+          ],
           const SizedBox(height: 24),
           Row(
             children: [

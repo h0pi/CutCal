@@ -60,6 +60,7 @@ public class SalonResponse
     public double AvgRating { get; set; }
     public bool IsApproved { get; set; }
     public bool AutoConfirm { get; set; }
+    public bool IsFeatured { get; set; }
     public DateTime CreatedAt { get; set; }
     public List<SalonWorkingHoursResponse> WorkingHours { get; set; } = new();
     public double? DistanceKm { get; set; }

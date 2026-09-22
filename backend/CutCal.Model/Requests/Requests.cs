@@ -95,6 +95,11 @@ public class SalonUpdateRequest
     public List<SalonWorkingHoursUpsertRequest> WorkingHours { get; set; } = new();
 }
 
+public class SalonFeatureRequest
+{
+    public bool Featured { get; set; }
+}
+
 public class SalonGalleryInsertRequest
 {
     public string ImageUrl { get; set; } = null!;
