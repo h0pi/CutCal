@@ -75,6 +75,19 @@ class SalonProvider extends BaseProvider<SalonModel> {
     final data = validateResponse(response) as List;
     return data.map((e) => SalonGalleryModel.fromJson(e)).toList();
   }
+
+  Future<SalonGalleryModel> addGalleryImage(int salonId, String imageUrl, {String? caption}) async {
+    final uri = Uri.parse('${AuthProvider.baseUrl}Salons/$salonId/Gallery');
+    final response = await http.post(uri, headers: createHeaders(), body: jsonEncode({'imageUrl': imageUrl, 'caption': caption}));
+    final data = validateResponse(response);
+    return SalonGalleryModel.fromJson(data);
+  }
+
+  Future<void> removeGalleryImage(int salonId, int imageId) async {
+    final uri = Uri.parse('${AuthProvider.baseUrl}Salons/$salonId/Gallery/$imageId');
+    final response = await http.delete(uri, headers: createHeaders());
+    validateResponse(response, allowEmpty: true);
+  }
 }
 
 class SalonServiceProvider extends BaseProvider<SalonServiceModel> {

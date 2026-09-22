@@ -186,12 +186,31 @@ class _SalonProfileScreenState extends State<SalonProfileScreen> {
         ],
       ),
     );
-    if (url == null || url.isEmpty || _selectedSalon == null) return;
+    if (url == null || url.trim().isEmpty || _selectedSalon == null) return;
 
-    // TODO: replace URL entry with a real file upload (file_picker) to storage.
-    await context.read<SalonProvider>().getGallery(_selectedSalon!.id);
-    if (mounted) showSuccessSnackBar(context, 'Gallery image added.');
-    await _selectSalon(_selectedSalon!);
+    try {
+      await context.read<SalonProvider>().addGalleryImage(_selectedSalon!.id, url.trim());
+      if (!mounted) return;
+      showSuccessSnackBar(context, 'Gallery image added.');
+      await _selectSalon(_selectedSalon!);
+    } on ApiClientException catch (e) {
+      if (mounted) showErrorSnackBar(context, e.message);
+    }
+  }
+
+  Future<void> _removeGalleryImage(SalonGalleryModel image) async {
+    if (_selectedSalon == null) return;
+    final confirmed = await showConfirmationDialog(context, title: 'Remove image', message: 'Remove this image from the gallery?');
+    if (!confirmed) return;
+
+    try {
+      await context.read<SalonProvider>().removeGalleryImage(_selectedSalon!.id, image.id);
+      if (!mounted) return;
+      showSuccessSnackBar(context, 'Gallery image removed.');
+      await _selectSalon(_selectedSalon!);
+    } on ApiClientException catch (e) {
+      if (mounted) showErrorSnackBar(context, e.message);
+    }
   }
 
   @override
@@ -256,16 +275,41 @@ class _SalonProfileScreenState extends State<SalonProfileScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _gallery
-                .map((g) => ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(resolveImageUrl(g.imageUrl), width: 120, height: 90, fit: BoxFit.cover),
-                    ))
-                .toList(),
-          ),
+          if (_gallery.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text('No gallery images yet.', style: TextStyle(color: Colors.grey)),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _gallery
+                  .map((g) => Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(resolveImageUrl(g.imageUrl), width: 120, height: 90, fit: BoxFit.cover),
+                          ),
+                          Positioned(
+                            top: 2,
+                            right: 2,
+                            child: Material(
+                              color: Colors.black54,
+                              shape: const CircleBorder(),
+                              child: IconButton(
+                                icon: const Icon(Icons.close, size: 16, color: Colors.white),
+                                tooltip: 'Remove image',
+                                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                padding: EdgeInsets.zero,
+                                onPressed: () => _removeGalleryImage(g),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ))
+                  .toList(),
+            ),
           const SizedBox(height: 24),
           FilledButton(onPressed: _save, child: const Text('Save changes')),
         ],

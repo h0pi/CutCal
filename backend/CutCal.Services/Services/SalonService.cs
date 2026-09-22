@@ -17,6 +17,7 @@ public interface ISalonService : IBaseCRUDService<SalonResponse, SalonSearchObje
     Task<SalonResponse> ApproveAsync(int id);
     Task<List<SalonGalleryResponse>> GetGalleryAsync(int salonId);
     Task<SalonGalleryResponse> AddGalleryImageAsync(int salonId, SalonGalleryInsertRequest request);
+    Task RemoveGalleryImageAsync(int salonId, int imageId);
     Task LogCategorySearchAsync(int userId, int categoryId);
     Task LogViewAsync(int userId, int salonId);
 }
@@ -169,6 +170,15 @@ public class SalonManagementService : BaseCRUDService<Salon, SalonResponse, Salo
         Context.SalonGalleries.Add(image);
         await Context.SaveChangesAsync();
         return image.Adapt<SalonGalleryResponse>();
+    }
+
+    public async Task RemoveGalleryImageAsync(int salonId, int imageId)
+    {
+        await OwnershipGuard.EnsureManagesSalonAsync(Context, salonId, _userAccessor);
+        var image = await Context.SalonGalleries.FirstOrDefaultAsync(x => x.Id == imageId && x.SalonId == salonId)
+            ?? throw new ClientException("Gallery image not found.");
+        Context.SalonGalleries.Remove(image);
+        await Context.SaveChangesAsync();
     }
 
     protected override Salon MapInsertToEntity(SalonInsertRequest request)

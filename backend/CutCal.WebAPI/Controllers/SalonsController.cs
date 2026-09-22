@@ -56,6 +56,14 @@ public class SalonsController : BaseCRUDController<SalonResponse, SalonSearchObj
         return Ok(await Service.AddGalleryImageAsync(id, request));
     }
 
+    [HttpDelete("{id:int}/Gallery/{imageId:int}")]
+    [Authorize(Roles = RoleNames.AdminOrManager)]
+    public async Task<IActionResult> RemoveGalleryImage(int id, int imageId)
+    {
+        await Service.RemoveGalleryImageAsync(id, imageId);
+        return NoContent();
+    }
+
     [HttpPost]
     [Authorize(Roles = RoleNames.AdminOrManager)]
     public override Task<ActionResult<SalonResponse>> Insert([FromBody] SalonInsertRequest request) => base.Insert(request);
