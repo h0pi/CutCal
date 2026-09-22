@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../providers/entity_providers.dart';
+import '../../utils/api_client_exception.dart';
 import '../../utils/utils_widgets.dart';
 
 class FavoritesScreen extends StatefulWidget {
@@ -15,6 +16,7 @@ class FavoritesScreen extends StatefulWidget {
 class _FavoritesScreenState extends State<FavoritesScreen> {
   List<FavoriteModel> _favorites = [];
   bool _isLoading = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -23,12 +25,24 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _isLoading = true);
-    final favorites = await context.read<FavoriteProvider>().getMine();
     setState(() {
-      _favorites = favorites;
-      _isLoading = false;
+      _isLoading = true;
+      _loadError = null;
     });
+    try {
+      final favorites = await context.read<FavoriteProvider>().getMine();
+      if (!mounted) return;
+      setState(() {
+        _favorites = favorites;
+        _isLoading = false;
+      });
+    } on ApiClientException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = e.message;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _remove(FavoriteModel favorite) async {
@@ -39,10 +53,14 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     );
     if (!confirmed) return;
 
-    await context.read<FavoriteProvider>().removeSalon(favorite.salonId);
-    if (mounted) {
-      showSuccessSnackBar(context, 'Removed from favorites.');
-      _load();
+    try {
+      await context.read<FavoriteProvider>().removeSalon(favorite.salonId);
+      if (mounted) {
+        showSuccessSnackBar(context, 'Removed from favorites.');
+        _load();
+      }
+    } on ApiClientException catch (e) {
+      if (mounted) showErrorSnackBar(context, e.message);
     }
   }
 
@@ -52,9 +70,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       appBar: AppBar(title: const Text('Favorites')),
       body: _isLoading
           ? const LoadingIndicator()
-          : _favorites.isEmpty
-              ? const Center(child: Text('No favorite salons yet.'))
-              : ListView.builder(
+          : _loadError != null
+              ? ErrorState(message: _loadError!, onRetry: _load)
+              : _favorites.isEmpty
+                  ? const Center(child: Text('No favorite salons yet.'))
+                  : ListView.builder(
                   itemCount: _favorites.length,
                   itemBuilder: (context, index) {
                     final favorite = _favorites[index];

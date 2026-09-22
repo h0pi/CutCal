@@ -19,6 +19,7 @@ class ManagerReviewsScreen extends StatefulWidget {
 class _ManagerReviewsScreenState extends State<ManagerReviewsScreen> {
   List<ReviewModel> _reviews = [];
   bool _isLoading = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -27,13 +28,24 @@ class _ManagerReviewsScreenState extends State<ManagerReviewsScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _isLoading = true);
-    final result = await context.read<ReviewProvider>().get(filter: {'salonId': widget.salonId, 'pageSize': 200});
-    if (!mounted) return;
     setState(() {
-      _reviews = result.items;
-      _isLoading = false;
+      _isLoading = true;
+      _loadError = null;
     });
+    try {
+      final result = await context.read<ReviewProvider>().get(filter: {'salonId': widget.salonId, 'pageSize': 200});
+      if (!mounted) return;
+      setState(() {
+        _reviews = result.items;
+        _isLoading = false;
+      });
+    } on ApiClientException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = e.message;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _reply(ReviewModel review) async {
@@ -74,7 +86,9 @@ class _ManagerReviewsScreenState extends State<ManagerReviewsScreen> {
       appBar: AppBar(title: const Text('Reviews')),
       body: _isLoading
           ? const LoadingIndicator()
-          : ListView(
+          : _loadError != null
+              ? ErrorState(message: _loadError!, onRetry: _load)
+              : ListView(
               padding: const EdgeInsets.all(16),
               children: [
                 Container(

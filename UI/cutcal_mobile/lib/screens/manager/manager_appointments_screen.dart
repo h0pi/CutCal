@@ -22,6 +22,7 @@ class _ManagerAppointmentsScreenState extends State<ManagerAppointmentsScreen> {
   String _status = 'All';
   List<AppointmentModel> _appointments = [];
   bool _isLoading = true;
+  String? _loadError;
   Timer? _pollTimer;
 
   @override
@@ -38,17 +39,34 @@ class _ManagerAppointmentsScreenState extends State<ManagerAppointmentsScreen> {
   }
 
   Future<void> _load({bool silent = false}) async {
-    if (!silent) setState(() => _isLoading = true);
-    // Auto-scoped server-side to salons this manager owns.
-    final result = await context.read<AppointmentProvider>().get(filter: {
-      'status': _status == 'All' ? null : _status,
-      'pageSize': 200,
-    });
-    if (!mounted) return;
-    setState(() {
-      _appointments = result.items;
-      _isLoading = false;
-    });
+    if (!silent) {
+      setState(() {
+        _isLoading = true;
+        _loadError = null;
+      });
+    }
+    try {
+      // Auto-scoped server-side to salons this manager owns.
+      final result = await context.read<AppointmentProvider>().get(filter: {
+        'status': _status == 'All' ? null : _status,
+        'pageSize': 200,
+      });
+      if (!mounted) return;
+      setState(() {
+        _appointments = result.items;
+        _isLoading = false;
+      });
+    } on ApiClientException catch (e) {
+      if (!mounted) return;
+      if (silent) {
+        debugPrint('Silent manager appointments refresh failed: ${e.message}');
+        return;
+      }
+      setState(() {
+        _loadError = e.message;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _confirm(AppointmentModel a) async {
@@ -121,9 +139,11 @@ class _ManagerAppointmentsScreenState extends State<ManagerAppointmentsScreen> {
           Expanded(
             child: _isLoading
                 ? const LoadingIndicator()
-                : _appointments.isEmpty
-                    ? const Center(child: Text('No appointments here.', style: TextStyle(color: AppColors.textSecondary)))
-                    : ListView.separated(
+                : _loadError != null
+                    ? ErrorState(message: _loadError!, onRetry: _load)
+                    : _appointments.isEmpty
+                        ? const Center(child: Text('No appointments here.', style: TextStyle(color: AppColors.textSecondary)))
+                        : ListView.separated(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                         itemCount: _appointments.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 12),

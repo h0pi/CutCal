@@ -94,6 +94,36 @@ class LoadingIndicator extends StatelessWidget {
   Widget build(BuildContext context) => const Center(child: CircularProgressIndicator());
 }
 
+/// Shown in place of a screen's content when its initial load fails (server
+/// down, no connection, timeout), with a button to retry the same load call.
+class ErrorState extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const ErrorState({super.key, required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(message, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary)),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              style: OutlinedButton.styleFrom(minimumSize: const Size(120, 44)),
+              onPressed: onRetry,
+              child: const Text('Try again'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Small uppercase status pill (PENDING / CONFIRMED / COMPLETED / DECLINED / PAID / UPCOMING),
 /// styled per the design reference: solid pale background, no border, bold uppercase text.
 class StatusBadge extends StatelessWidget {

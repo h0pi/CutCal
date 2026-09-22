@@ -26,6 +26,7 @@ class ManagerSalonScreen extends StatefulWidget {
 class _ManagerSalonScreenState extends State<ManagerSalonScreen> {
   SalonModel? _salon;
   bool _isLoading = true;
+  String? _loadError;
   bool _isSaving = false;
   XFile? _pickedCover;
   double? _latitude;
@@ -47,28 +48,39 @@ class _ManagerSalonScreenState extends State<ManagerSalonScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _isLoading = true);
-    final salons = await context.read<SalonProvider>().get(filter: {'pageSize': 20});
-    final salon = salons.items.firstOrNull;
-    if (!mounted) return;
     setState(() {
-      _salon = salon;
-      if (salon != null) {
-        _nameController.text = salon.name;
-        _bioController.text = salon.description ?? '';
-        _addressController.text = salon.address;
-        _phoneController.text = salon.phone ?? '';
-        _latitude = salon.latitude;
-        _longitude = salon.longitude;
-        _locationChanged = false;
-        if (salon.workingHours.isNotEmpty) {
-          for (final wh in salon.workingHours) {
-            if (wh.dayOfWeek >= 0 && wh.dayOfWeek < 7) _hours[wh.dayOfWeek] = wh;
+      _isLoading = true;
+      _loadError = null;
+    });
+    try {
+      final salons = await context.read<SalonProvider>().get(filter: {'pageSize': 20});
+      final salon = salons.items.firstOrNull;
+      if (!mounted) return;
+      setState(() {
+        _salon = salon;
+        if (salon != null) {
+          _nameController.text = salon.name;
+          _bioController.text = salon.description ?? '';
+          _addressController.text = salon.address;
+          _phoneController.text = salon.phone ?? '';
+          _latitude = salon.latitude;
+          _longitude = salon.longitude;
+          _locationChanged = false;
+          if (salon.workingHours.isNotEmpty) {
+            for (final wh in salon.workingHours) {
+              if (wh.dayOfWeek >= 0 && wh.dayOfWeek < 7) _hours[wh.dayOfWeek] = wh;
+            }
           }
         }
-      }
-      _isLoading = false;
-    });
+        _isLoading = false;
+      });
+    } on ApiClientException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = e.message;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _pickLocation() async {
@@ -213,9 +225,11 @@ class _ManagerSalonScreenState extends State<ManagerSalonScreen> {
       appBar: AppBar(title: const Text('Salon')),
       body: _isLoading
           ? const LoadingIndicator()
-          : _salon == null
-              ? const Center(child: Text('No salon assigned to your account yet.', style: TextStyle(color: AppColors.textSecondary)))
-              : ListView(
+          : _loadError != null
+              ? ErrorState(message: _loadError!, onRetry: _load)
+              : _salon == null
+                  ? const Center(child: Text('No salon assigned to your account yet.', style: TextStyle(color: AppColors.textSecondary)))
+                  : ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
                     GestureDetector(

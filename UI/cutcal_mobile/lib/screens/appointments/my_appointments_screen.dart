@@ -24,6 +24,7 @@ class _MyAppointmentsScreenState extends State<MyAppointmentsScreen> {
   int _selectedTab = 0;
   List<AppointmentModel> _all = [];
   bool _isLoading = true;
+  String? _loadError;
   Timer? _pollTimer;
 
   @override
@@ -42,14 +43,33 @@ class _MyAppointmentsScreenState extends State<MyAppointmentsScreen> {
   }
 
   Future<void> _load({bool silent = false}) async {
-    if (!silent) setState(() => _isLoading = true);
-    final userId = context.read<AuthProvider>().userId;
-    final result = await context.read<AppointmentProvider>().get(filter: {'customerId': userId, 'pageSize': 100});
-    if (!mounted) return;
-    setState(() {
-      _all = result.items;
-      _isLoading = false;
-    });
+    if (!silent) {
+      setState(() {
+        _isLoading = true;
+        _loadError = null;
+      });
+    }
+    try {
+      final userId = context.read<AuthProvider>().userId;
+      final result = await context.read<AppointmentProvider>().get(filter: {'customerId': userId, 'pageSize': 100});
+      if (!mounted) return;
+      setState(() {
+        _all = result.items;
+        _isLoading = false;
+      });
+    } on ApiClientException catch (e) {
+      if (!mounted) return;
+      // A silent poll failure keeps showing the last good list instead of
+      // replacing it for a one-off blip.
+      if (silent) {
+        debugPrint('Silent appointments refresh failed: ${e.message}');
+        return;
+      }
+      setState(() {
+        _loadError = e.message;
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -63,7 +83,9 @@ class _MyAppointmentsScreenState extends State<MyAppointmentsScreen> {
       appBar: AppBar(title: const Text('Appointments')),
       body: _isLoading
           ? const LoadingIndicator()
-          : RefreshIndicator(
+          : _loadError != null
+              ? ErrorState(message: _loadError!, onRetry: _load)
+              : RefreshIndicator(
               onRefresh: _load,
               child: CustomScrollView(
                 slivers: [

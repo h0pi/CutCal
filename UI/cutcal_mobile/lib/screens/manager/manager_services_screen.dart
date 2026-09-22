@@ -18,6 +18,7 @@ class _ManagerServicesScreenState extends State<ManagerServicesScreen> {
   List<SalonModel> _salons = [];
   List<SalonServiceModel> _services = [];
   bool _isLoading = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -26,20 +27,31 @@ class _ManagerServicesScreenState extends State<ManagerServicesScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _isLoading = true);
-    // Both endpoints are auto-scoped server-side to salons this manager owns,
-    // and independent of each other, so they're fetched concurrently.
-    final salonsFuture = context.read<SalonProvider>().get(filter: {'pageSize': 20});
-    final servicesFuture = context.read<SalonServiceProvider>().get(filter: {'pageSize': 200});
-
-    final salons = await salonsFuture;
-    final services = await servicesFuture;
-    if (!mounted) return;
     setState(() {
-      _salons = salons.items;
-      _services = services.items;
-      _isLoading = false;
+      _isLoading = true;
+      _loadError = null;
     });
+    try {
+      // Both endpoints are auto-scoped server-side to salons this manager owns,
+      // and independent of each other, so they're fetched concurrently.
+      final salonsFuture = context.read<SalonProvider>().get(filter: {'pageSize': 20});
+      final servicesFuture = context.read<SalonServiceProvider>().get(filter: {'pageSize': 200});
+
+      final salons = await salonsFuture;
+      final services = await servicesFuture;
+      if (!mounted) return;
+      setState(() {
+        _salons = salons.items;
+        _services = services.items;
+        _isLoading = false;
+      });
+    } on ApiClientException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = e.message;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _openForm({SalonServiceModel? service}) async {
@@ -175,9 +187,11 @@ class _ManagerServicesScreenState extends State<ManagerServicesScreen> {
       ),
       body: _isLoading
           ? const LoadingIndicator()
-          : _services.isEmpty
-              ? const Center(child: Text('No services yet. Tap + to add one.', style: TextStyle(color: AppColors.textSecondary)))
-              : ListView.separated(
+          : _loadError != null
+              ? ErrorState(message: _loadError!, onRetry: _load)
+              : _services.isEmpty
+                  ? const Center(child: Text('No services yet. Tap + to add one.', style: TextStyle(color: AppColors.textSecondary)))
+                  : ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: _services.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 12),

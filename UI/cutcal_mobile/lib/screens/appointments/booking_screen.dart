@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../providers/entity_providers.dart';
+import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/utils_widgets.dart';
 import 'availability_picker.dart';
 import 'payment_screen.dart';
 import '../../utils/image_url.dart';
@@ -27,6 +29,10 @@ class _BookingScreenState extends State<BookingScreen> {
   SalonServiceModel? _selectedService;
   StaffModel? _selectedStaff;
   DateTime? _selectedStart;
+  bool _isLoadingServices = true;
+  String? _loadError;
+  bool _isLoadingStaff = false;
+  String? _staffLoadError;
 
   @override
   void initState() {
@@ -35,14 +41,32 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Future<void> _loadServices() async {
-    final result = await context.read<SalonServiceProvider>().get(filter: {'salonId': widget.salon.id, 'isActive': true});
-    if (mounted) setState(() => _services = result.items);
+    setState(() {
+      _isLoadingServices = true;
+      _loadError = null;
+    });
+    try {
+      final result = await context.read<SalonServiceProvider>().get(filter: {'salonId': widget.salon.id, 'isActive': true});
+      if (mounted) setState(() => _services = result.items);
+    } on ApiClientException catch (e) {
+      if (mounted) setState(() => _loadError = e.message);
+    } finally {
+      if (mounted) setState(() => _isLoadingServices = false);
+    }
   }
 
   Future<void> _loadStaff() async {
-    final result = await context.read<StaffProvider>().get(filter: {'salonId': widget.salon.id, 'isActive': true});
-    if (mounted) {
-      setState(() => _staff = result.items.where((s) => s.serviceIds.contains(_selectedService!.id)).toList());
+    setState(() {
+      _isLoadingStaff = true;
+      _staffLoadError = null;
+    });
+    try {
+      final result = await context.read<StaffProvider>().get(filter: {'salonId': widget.salon.id, 'isActive': true});
+      if (mounted) setState(() => _staff = result.items.where((s) => s.serviceIds.contains(_selectedService!.id)).toList());
+    } on ApiClientException catch (e) {
+      if (mounted) setState(() => _staffLoadError = e.message);
+    } finally {
+      if (mounted) setState(() => _isLoadingStaff = false);
     }
   }
 
@@ -125,6 +149,8 @@ class _BookingScreenState extends State<BookingScreen> {
   Widget _buildStepContent() {
     switch (_step) {
       case 0:
+        if (_isLoadingServices) return const LoadingIndicator();
+        if (_loadError != null) return ErrorState(message: _loadError!, onRetry: _loadServices);
         return ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           itemCount: _services.length,
@@ -151,6 +177,8 @@ class _BookingScreenState extends State<BookingScreen> {
         if (_selectedService == null) {
           return const Center(child: Text('Select a service first.', style: TextStyle(color: AppColors.textSecondary)));
         }
+        if (_isLoadingStaff) return const LoadingIndicator();
+        if (_staffLoadError != null) return ErrorState(message: _staffLoadError!, onRetry: _loadStaff);
         if (_staff.isEmpty) {
           return const Padding(
             padding: EdgeInsets.all(16),

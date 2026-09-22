@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../providers/entity_providers.dart';
+import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/utils_widgets.dart';
 import 'salon_detail_screen.dart';
@@ -28,6 +29,7 @@ class _SalonMapScreenState extends State<SalonMapScreen> {
   final _searchController = TextEditingController();
   List<SalonModel> _salons = [];
   bool _isLoading = true;
+  String? _loadError;
   GoogleMapController? _mapController;
   LatLng _initialCenter = _fallbackCenter;
   SalonModel? _selectedSalon;
@@ -78,21 +80,34 @@ class _SalonMapScreenState extends State<SalonMapScreen> {
   }
 
   Future<void> _load({String? name}) async {
-    setState(() => _isLoading = true);
-    final salons = await context.read<SalonProvider>().get(filter: {
-      'pageSize': 100,
-      'name': name,
-      'lat': _userLocation?.latitude,
-      'lng': _userLocation?.longitude,
-      'minRating': _topRatedOnly ? _topRatedMin : null,
-      'openNow': _openNowOnly ? true : null,
-      'nowLocal': _openNowOnly ? DateTime.now().toIso8601String() : null,
-    });
-    if (!mounted) return;
     setState(() {
-      _salons = salons.items;
-      _isLoading = false;
+      _isLoading = true;
+      _loadError = null;
     });
+    try {
+      final salons = await context.read<SalonProvider>().get(filter: {
+        'pageSize': 100,
+        'name': name,
+        'lat': _userLocation?.latitude,
+        'lng': _userLocation?.longitude,
+        'minRating': _topRatedOnly ? _topRatedMin : null,
+        'openNow': _openNowOnly ? true : null,
+        'nowLocal': _openNowOnly ? DateTime.now().toIso8601String() : null,
+      });
+      if (!mounted) return;
+      setState(() {
+        _salons = salons.items;
+        _isLoading = false;
+      });
+    } on ApiClientException catch (e) {
+      // The map itself stays usable even if pins fail to load, so this shows
+      // a small retry banner instead of replacing the whole screen.
+      if (!mounted) return;
+      setState(() {
+        _loadError = e.message;
+        _isLoading = false;
+      });
+    }
   }
 
   Widget _filterChip(String label, bool selected, void Function(bool) assign) {
@@ -175,6 +190,18 @@ class _SalonMapScreenState extends State<SalonMapScreen> {
                       ],
                     ),
                   ),
+                  if (_loadError != null)
+                    Container(
+                      margin: const EdgeInsets.only(top: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)]),
+                      child: Row(
+                        children: [
+                          Expanded(child: Text(_loadError!, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12))),
+                          TextButton(onPressed: () => _load(name: _searchController.text.isEmpty ? null : _searchController.text), child: const Text('Retry')),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),

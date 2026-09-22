@@ -26,6 +26,7 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
   double _weekRevenue = 0;
   double? _revenueChangePct;
   bool _isLoading = true;
+  String? _loadError;
   Timer? _pollTimer;
 
   @override
@@ -42,54 +43,74 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
   }
 
   Future<void> _load({bool silent = false}) async {
-    if (!silent) setState(() => _isLoading = true);
-
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final weekStart = today.subtract(const Duration(days: 6));
-    final prevWeekStart = weekStart.subtract(const Duration(days: 7));
-
-    // The backend automatically scopes both of these to salons this manager owns.
-    // The four calls are independent, so they're kicked off together instead of
-    // one after another — this runs every 20s via the poll timer, so it matters.
-    final salonsFuture = context.read<SalonProvider>().get(filter: {'pageSize': 20});
-    final appointmentsFuture = context.read<AppointmentProvider>().get(filter: {'pageSize': 200});
-    final thisWeekReportFuture = context.read<ReportProvider>().getSummary(dateFrom: weekStart, dateTo: now);
-    final prevWeekReportFuture = context.read<ReportProvider>().getSummary(dateFrom: prevWeekStart, dateTo: weekStart);
-
-    final salons = await salonsFuture;
-    final appointments = await appointmentsFuture;
-    final thisWeekReport = await thisWeekReportFuture;
-    final prevWeekReport = await prevWeekReportFuture;
-
-    final pending = appointments.items.where((a) => a.stateName == 'Pending');
-    final todays = appointments.items.where((a) =>
-        a.scheduledAt.year == now.year && a.scheduledAt.month == now.month && a.scheduledAt.day == now.day);
-
-    final dailyRevenue = List<double>.filled(7, 0);
-    final thisWeekAppointments = (thisWeekReport['appointmentsReport']?['appointments'] as List?) ?? [];
-    for (final json in thisWeekAppointments) {
-      if (json['paymentStatus'] != 'Paid') continue;
-      final scheduledAt = DateTime.parse(json['scheduledAt']);
-      final dayIndex = DateTime(scheduledAt.year, scheduledAt.month, scheduledAt.day).difference(weekStart).inDays;
-      if (dayIndex < 0 || dayIndex > 6) continue;
-      dailyRevenue[dayIndex] += (json['price'] as num).toDouble();
+    if (!silent) {
+      setState(() {
+        _isLoading = true;
+        _loadError = null;
+      });
     }
 
-    final weekRevenue = (thisWeekReport['appointmentsReport']?['totalRevenue'] as num?)?.toDouble() ?? 0;
-    final prevWeekRevenue = (prevWeekReport['appointmentsReport']?['totalRevenue'] as num?)?.toDouble() ?? 0;
-    final changePct = prevWeekRevenue == 0 ? null : ((weekRevenue - prevWeekRevenue) / prevWeekRevenue) * 100;
+    try {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final weekStart = today.subtract(const Duration(days: 6));
+      final prevWeekStart = weekStart.subtract(const Duration(days: 7));
 
-    if (!mounted) return;
-    setState(() {
-      _salon = salons.items.firstOrNull;
-      _todayAppointments = todays.toList()..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
-      _pendingAppointments = pending.toList();
-      _dailyRevenue = dailyRevenue;
-      _weekRevenue = weekRevenue;
-      _revenueChangePct = changePct;
-      _isLoading = false;
-    });
+      // The backend automatically scopes both of these to salons this manager owns.
+      // The four calls are independent, so they're kicked off together instead of
+      // one after another — this runs every 20s via the poll timer, so it matters.
+      final salonsFuture = context.read<SalonProvider>().get(filter: {'pageSize': 20});
+      final appointmentsFuture = context.read<AppointmentProvider>().get(filter: {'pageSize': 200});
+      final thisWeekReportFuture = context.read<ReportProvider>().getSummary(dateFrom: weekStart, dateTo: now);
+      final prevWeekReportFuture = context.read<ReportProvider>().getSummary(dateFrom: prevWeekStart, dateTo: weekStart);
+
+      final salons = await salonsFuture;
+      final appointments = await appointmentsFuture;
+      final thisWeekReport = await thisWeekReportFuture;
+      final prevWeekReport = await prevWeekReportFuture;
+
+      final pending = appointments.items.where((a) => a.stateName == 'Pending');
+      final todays = appointments.items.where((a) =>
+          a.scheduledAt.year == now.year && a.scheduledAt.month == now.month && a.scheduledAt.day == now.day);
+
+      final dailyRevenue = List<double>.filled(7, 0);
+      final thisWeekAppointments = (thisWeekReport['appointmentsReport']?['appointments'] as List?) ?? [];
+      for (final json in thisWeekAppointments) {
+        if (json['paymentStatus'] != 'Paid') continue;
+        final scheduledAt = DateTime.parse(json['scheduledAt']);
+        final dayIndex = DateTime(scheduledAt.year, scheduledAt.month, scheduledAt.day).difference(weekStart).inDays;
+        if (dayIndex < 0 || dayIndex > 6) continue;
+        dailyRevenue[dayIndex] += (json['price'] as num).toDouble();
+      }
+
+      final weekRevenue = (thisWeekReport['appointmentsReport']?['totalRevenue'] as num?)?.toDouble() ?? 0;
+      final prevWeekRevenue = (prevWeekReport['appointmentsReport']?['totalRevenue'] as num?)?.toDouble() ?? 0;
+      final changePct = prevWeekRevenue == 0 ? null : ((weekRevenue - prevWeekRevenue) / prevWeekRevenue) * 100;
+
+      if (!mounted) return;
+      setState(() {
+        _salon = salons.items.firstOrNull;
+        _todayAppointments = todays.toList()..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+        _pendingAppointments = pending.toList();
+        _dailyRevenue = dailyRevenue;
+        _weekRevenue = weekRevenue;
+        _revenueChangePct = changePct;
+        _isLoading = false;
+      });
+    } on ApiClientException catch (e) {
+      if (!mounted) return;
+      // A silent poll failure keeps showing the last good data instead of
+      // blowing it away for a one-off blip; only the initial/manual load
+      // (which has nothing to show yet) surfaces the error screen.
+      if (silent) {
+        debugPrint('Silent dashboard refresh failed: ${e.message}');
+        return;
+      }
+      setState(() {
+        _loadError = e.message;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _confirm(AppointmentModel a) async {
@@ -121,7 +142,9 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
       appBar: AppBar(title: const Text('Home')),
       body: _isLoading
           ? const LoadingIndicator()
-          : RefreshIndicator(
+          : _loadError != null
+              ? ErrorState(message: _loadError!, onRetry: _load)
+              : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
                 padding: const EdgeInsets.all(16),

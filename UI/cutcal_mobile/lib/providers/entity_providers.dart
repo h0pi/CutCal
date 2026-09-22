@@ -23,14 +23,14 @@ class SalonProvider extends BaseProvider<SalonModel> {
 
   Future<List<SalonGalleryModel>> getGallery(int salonId) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}Salons/$salonId/Gallery');
-    final response = await http.get(uri, headers: createHeaders());
+    final response = await sendRequest(http.get(uri, headers: createHeaders()));
     final data = validateResponse(response) as List;
     return data.map((e) => SalonGalleryModel.fromJson(e)).toList();
   }
 
   Future<void> logView(int salonId) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}Salons/$salonId/View');
-    final response = await http.post(uri, headers: createHeaders());
+    final response = await sendRequest(http.post(uri, headers: createHeaders()));
     validateResponse(response, allowEmpty: true);
   }
 }
@@ -60,28 +60,29 @@ class AppointmentProvider extends BaseProvider<AppointmentModel> {
 
   Future<AppointmentModel> cancel(int id, String reason) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}Appointments/$id/Cancel');
-    final response = await http.put(uri, headers: createHeaders(), body: jsonEncode({'reason': reason}));
+    final response = await sendRequest(http.put(uri, headers: createHeaders(), body: jsonEncode({'reason': reason})));
     final data = validateResponse(response);
     return fromJson(data);
   }
 
   Future<AppointmentModel> confirm(int id) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}Appointments/$id/Confirm');
-    final response = await http.put(uri, headers: createHeaders());
+    final response = await sendRequest(http.put(uri, headers: createHeaders()));
     final data = validateResponse(response);
     return fromJson(data);
   }
 
   Future<AppointmentModel> complete(int id) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}Appointments/$id/Complete');
-    final response = await http.put(uri, headers: createHeaders());
+    final response = await sendRequest(http.put(uri, headers: createHeaders()));
     final data = validateResponse(response);
     return fromJson(data);
   }
 
   Future<AppointmentModel> reschedule(int id, DateTime scheduledAt) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}Appointments/$id/Reschedule');
-    final response = await http.put(uri, headers: createHeaders(), body: jsonEncode({'scheduledAt': scheduledAt.toIso8601String()}));
+    final response =
+        await sendRequest(http.put(uri, headers: createHeaders(), body: jsonEncode({'scheduledAt': scheduledAt.toIso8601String()})));
     final data = validateResponse(response);
     return fromJson(data);
   }
@@ -96,7 +97,7 @@ class ReviewProvider extends BaseProvider<ReviewModel> {
 
   Future<ReviewModel> reply(int id, String reply) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}Reviews/$id/Reply');
-    final response = await http.put(uri, headers: createHeaders(), body: jsonEncode({'reply': reply}));
+    final response = await sendRequest(http.put(uri, headers: createHeaders(), body: jsonEncode({'reply': reply})));
     final data = validateResponse(response);
     return fromJson(data);
   }
@@ -111,13 +112,13 @@ class NotificationProvider extends BaseProvider<NotificationModel> {
 
   Future<void> markRead(int id) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}Notifications/$id/MarkRead');
-    final response = await http.put(uri, headers: createHeaders());
+    final response = await sendRequest(http.put(uri, headers: createHeaders()));
     validateResponse(response, allowEmpty: true);
   }
 
   Future<void> markAllRead() async {
     final uri = Uri.parse('${AuthProvider.baseUrl}Notifications/MarkAllRead');
-    final response = await http.put(uri, headers: createHeaders());
+    final response = await sendRequest(http.put(uri, headers: createHeaders()));
     validateResponse(response, allowEmpty: true);
   }
 }
@@ -131,7 +132,7 @@ class RecommendationProvider extends BaseProvider<RecommendationModel> {
 
   Future<List<RecommendationModel>> getRecommendations({double? lat, double? lng}) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}Recommendations${getQueryString({'lat': lat, 'lng': lng})}');
-    final response = await http.get(uri, headers: createHeaders());
+    final response = await sendRequest(http.get(uri, headers: createHeaders()));
     final data = validateResponse(response) as List;
     return data.map((e) => RecommendationModel.fromJson(e)).toList();
   }
@@ -146,17 +147,17 @@ class PaymentProvider extends BaseProvider<Map<String, dynamic>> {
 
   Future<Map<String, dynamic>> createOrder(int appointmentId) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}Payments/CreateOrder');
-    final response = await http.post(uri, headers: createHeaders(), body: jsonEncode({'appointmentId': appointmentId}));
+    final response = await sendRequest(http.post(uri, headers: createHeaders(), body: jsonEncode({'appointmentId': appointmentId})));
     return Map<String, dynamic>.from(validateResponse(response));
   }
 
   Future<Map<String, dynamic>> captureOrder(String paypalOrderId, int appointmentId) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}Payments/CaptureOrder');
-    final response = await http.post(
+    final response = await sendRequest(http.post(
       uri,
       headers: createHeaders(),
       body: jsonEncode({'paypalOrderId': paypalOrderId, 'appointmentId': appointmentId}),
-    );
+    ));
     return Map<String, dynamic>.from(validateResponse(response));
   }
 }
@@ -185,7 +186,7 @@ class AvailabilityProvider extends BaseProvider<AvailabilityDayModel> {
       'nowLocal': DateTime.now().toIso8601String(),
     });
     final uri = Uri.parse('${AuthProvider.baseUrl}Salons/$salonId/Availability/Days$query');
-    final response = await http.get(uri, headers: createHeaders());
+    final response = await sendRequest(http.get(uri, headers: createHeaders()));
     final data = validateResponse(response) as List;
     return data.map((e) => AvailabilityDayModel.fromJson(e)).toList();
   }
@@ -205,7 +206,7 @@ class AvailabilityProvider extends BaseProvider<AvailabilityDayModel> {
       'nowLocal': DateTime.now().toIso8601String(),
     });
     final uri = Uri.parse('${AuthProvider.baseUrl}Salons/$salonId/Availability/Slots$query');
-    final response = await http.get(uri, headers: createHeaders());
+    final response = await sendRequest(http.get(uri, headers: createHeaders()));
     final data = validateResponse(response) as List;
     return data.map((e) => AvailabilitySlotModel.fromJson(e)).toList();
   }
@@ -223,7 +224,7 @@ class ReportProvider extends BaseProvider<Map<String, dynamic>> {
           'dateFrom': dateFrom?.toIso8601String(),
           'dateTo': dateTo?.toIso8601String(),
         })}');
-    final response = await http.get(uri, headers: createHeaders());
+    final response = await sendRequest(http.get(uri, headers: createHeaders()));
     return Map<String, dynamic>.from(validateResponse(response));
   }
 }
@@ -237,20 +238,20 @@ class FavoriteProvider extends BaseProvider<FavoriteModel> {
 
   Future<List<FavoriteModel>> getMine() async {
     final uri = Uri.parse('${AuthProvider.baseUrl}Favorites');
-    final response = await http.get(uri, headers: createHeaders());
+    final response = await sendRequest(http.get(uri, headers: createHeaders()));
     final data = validateResponse(response) as List;
     return data.map((e) => FavoriteModel.fromJson(e)).toList();
   }
 
   Future<void> add(int salonId) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}Favorites/$salonId');
-    final response = await http.post(uri, headers: createHeaders());
+    final response = await sendRequest(http.post(uri, headers: createHeaders()));
     validateResponse(response, allowEmpty: true);
   }
 
   Future<void> removeSalon(int salonId) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}Favorites/$salonId');
-    final response = await http.delete(uri, headers: createHeaders());
+    final response = await sendRequest(http.delete(uri, headers: createHeaders()));
     validateResponse(response, allowEmpty: true);
   }
 }
@@ -264,7 +265,7 @@ class UserProvider extends BaseProvider<UserModel> {
 
   Future<void> changePassword(int userId, String oldPassword, String newPassword) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}Users/$userId/ChangePassword');
-    final response = await http.put(
+    final response = await sendRequest(http.put(
       uri,
       headers: createHeaders(),
       body: jsonEncode({
@@ -272,7 +273,7 @@ class UserProvider extends BaseProvider<UserModel> {
         'newPassword': newPassword,
         'confirmNewPassword': newPassword,
       }),
-    );
+    ));
     validateResponse(response, allowEmpty: true);
   }
 }
@@ -286,7 +287,7 @@ class GeocodingProvider extends BaseProvider<GeocodeResultModel> {
 
   Future<List<GeocodeResultModel>> search(String query) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}Geocoding/Search${getQueryString({'query': query})}');
-    final response = await http.get(uri, headers: createHeaders());
+    final response = await sendRequest(http.get(uri, headers: createHeaders()));
     final data = validateResponse(response) as List;
     return data.map((e) => GeocodeResultModel.fromJson(e)).toList();
   }

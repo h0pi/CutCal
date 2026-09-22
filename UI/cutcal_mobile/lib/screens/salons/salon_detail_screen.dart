@@ -39,6 +39,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   List<StaffModel> _staff = [];
   List<SalonServiceModel> _services = [];
   bool _isLoading = true;
+  String? _loadError;
   bool _isFavorite = false;
   int _carouselIndex = 0;
   bool _hoursExpanded = false;
@@ -60,39 +61,52 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   }
 
   Future<void> _load() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+
     final salonProvider = context.read<SalonProvider>();
     final reviewProvider = context.read<ReviewProvider>();
     final staffProvider = context.read<StaffProvider>();
     final serviceProvider = context.read<SalonServiceProvider>();
     final favoriteProvider = context.read<FavoriteProvider>();
 
-    // Kicked off together (each call fires its request immediately) and only
-    // awaited below, so the six independent calls run concurrently instead of
-    // one after another.
-    final salonFuture = salonProvider.getById(widget.salonId);
-    final galleryFuture = salonProvider.getGallery(widget.salonId);
-    final reviewsFuture = reviewProvider.get(filter: {'salonId': widget.salonId, 'pageSize': 20});
-    final staffFuture = staffProvider.get(filter: {'salonId': widget.salonId, 'isActive': true, 'pageSize': 50});
-    final servicesFuture = serviceProvider.get(filter: {'salonId': widget.salonId, 'isActive': true, 'pageSize': 50});
-    final favoritesFuture = favoriteProvider.getMine();
+    try {
+      // Kicked off together (each call fires its request immediately) and only
+      // awaited below, so the six independent calls run concurrently instead of
+      // one after another.
+      final salonFuture = salonProvider.getById(widget.salonId);
+      final galleryFuture = salonProvider.getGallery(widget.salonId);
+      final reviewsFuture = reviewProvider.get(filter: {'salonId': widget.salonId, 'pageSize': 20});
+      final staffFuture = staffProvider.get(filter: {'salonId': widget.salonId, 'isActive': true, 'pageSize': 50});
+      final servicesFuture = serviceProvider.get(filter: {'salonId': widget.salonId, 'isActive': true, 'pageSize': 50});
+      final favoritesFuture = favoriteProvider.getMine();
 
-    final salon = await salonFuture;
-    final gallery = await galleryFuture;
-    final reviews = await reviewsFuture;
-    final staff = await staffFuture;
-    final services = await servicesFuture;
-    final favorites = await favoritesFuture;
+      final salon = await salonFuture;
+      final gallery = await galleryFuture;
+      final reviews = await reviewsFuture;
+      final staff = await staffFuture;
+      final services = await servicesFuture;
+      final favorites = await favoritesFuture;
 
-    if (!mounted) return;
-    setState(() {
-      _salon = salon;
-      _gallery = gallery;
-      _reviews = reviews.items;
-      _staff = staff.items;
-      _services = services.items;
-      _isFavorite = favorites.any((f) => f.salonId == widget.salonId);
-      _isLoading = false;
-    });
+      if (!mounted) return;
+      setState(() {
+        _salon = salon;
+        _gallery = gallery;
+        _reviews = reviews.items;
+        _staff = staff.items;
+        _services = services.items;
+        _isFavorite = favorites.any((f) => f.salonId == widget.salonId);
+        _isLoading = false;
+      });
+    } on ApiClientException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = e.message;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _toggleFavorite() async {
@@ -116,8 +130,14 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading || _salon == null) {
+    if (_isLoading) {
       return const Scaffold(body: LoadingIndicator());
+    }
+    if (_salon == null) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: ErrorState(message: _loadError ?? 'Could not load this salon.', onRetry: _load),
+      );
     }
 
     final salon = _salon!;

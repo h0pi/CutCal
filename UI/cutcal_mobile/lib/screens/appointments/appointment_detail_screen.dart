@@ -22,6 +22,7 @@ class AppointmentDetailScreen extends StatefulWidget {
 class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
   AppointmentModel? _appointment;
   bool _isLoading = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -30,12 +31,32 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
   }
 
   Future<void> _load() async {
-    final appointment = await context.read<AppointmentProvider>().getById(widget.appointmentId);
-    if (!mounted) return;
-    setState(() {
-      _appointment = appointment;
-      _isLoading = false;
-    });
+    if (_appointment == null) {
+      setState(() {
+        _isLoading = true;
+        _loadError = null;
+      });
+    }
+    try {
+      final appointment = await context.read<AppointmentProvider>().getById(widget.appointmentId);
+      if (!mounted) return;
+      setState(() {
+        _appointment = appointment;
+        _isLoading = false;
+      });
+    } on ApiClientException catch (e) {
+      if (!mounted) return;
+      // Once we already have data on screen (e.g. refreshing after cancel/reschedule),
+      // a refresh failure just keeps showing it instead of wiping the screen.
+      if (_appointment != null) {
+        debugPrint('Appointment refresh failed: ${e.message}');
+        return;
+      }
+      setState(() {
+        _loadError = e.message;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _cancel() async {
@@ -114,8 +135,15 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading || _appointment == null) {
+    if (_isLoading) {
       return const Scaffold(backgroundColor: AppColors.background, body: LoadingIndicator());
+    }
+    if (_appointment == null) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(backgroundColor: AppColors.background, elevation: 0),
+        body: ErrorState(message: _loadError ?? 'Could not load this appointment.', onRetry: _load),
+      );
     }
 
     final a = _appointment!;

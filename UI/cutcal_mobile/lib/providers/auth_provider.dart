@@ -25,11 +25,11 @@ class AuthProvider with ChangeNotifier {
 
   Future<bool> login(String username, String password) async {
     final uri = Uri.parse('${baseUrl}Access/Login');
-    final response = await http.post(
+    final response = await _sendRequest(http.post(
       uri,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'username': username, 'password': password}),
-    );
+    ));
 
     if (response.statusCode != 200) {
       throw ApiClientException(_extractMessage(response), statusCode: response.statusCode);
@@ -43,11 +43,11 @@ class AuthProvider with ChangeNotifier {
 
   Future<bool> register(Map<String, dynamic> request) async {
     final uri = Uri.parse('${baseUrl}Access/Register');
-    final response = await http.post(
+    final response = await _sendRequest(http.post(
       uri,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(request),
-    );
+    ));
 
     if (response.statusCode != 200) {
       throw ApiClientException(_extractMessage(response), statusCode: response.statusCode);
@@ -55,15 +55,24 @@ class AuthProvider with ChangeNotifier {
     return true;
   }
 
+  /// On any failure (including network) the session is just cleared and this returns
+  /// false, matching a plain "not logged in" — this runs on startup, so it must never
+  /// throw and interrupt the app.
   Future<bool> refreshTokenLogin() async {
     if (refreshToken == null) return false;
 
     final uri = Uri.parse('${baseUrl}Access/LoginWithRefreshToken');
-    final response = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'refreshToken': refreshToken}),
-    );
+    late final http.Response response;
+    try {
+      response = await _sendRequest(http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refreshToken': refreshToken}),
+      ));
+    } on ApiClientException {
+      _clearSession();
+      return false;
+    }
 
     if (response.statusCode != 200) {
       _clearSession();
@@ -74,6 +83,19 @@ class AuthProvider with ChangeNotifier {
     _applyLoginResponse(json);
     notifyListeners();
     return true;
+  }
+
+  /// Runs a request with a timeout and turns network failures (server down, no
+  /// connection, timeout) into a readable [ApiClientException] instead of an
+  /// unhandled error. Mirrors BaseProvider.sendRequest for the few calls made
+  /// before a token exists, so AuthProvider doesn't need to extend it.
+  Future<http.Response> _sendRequest(Future<http.Response> request) async {
+    try {
+      return await request.timeout(const Duration(seconds: 20));
+    } on Exception catch (e) {
+      debugPrint('Request failed: $e');
+      throw ApiClientException('Cannot reach the server. Please check your connection and try again.');
+    }
   }
 
   void _applyLoginResponse(Map<String, dynamic> json) {
@@ -90,11 +112,11 @@ class AuthProvider with ChangeNotifier {
     if (access == null) return;
 
     try {
-      await http.post(
+      await _sendRequest(http.post(
         Uri.parse('${baseUrl}Access/Logout'),
         headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $access'},
         body: jsonEncode({'refreshToken': refresh}),
-      );
+      ));
     } on Exception catch (e) {
       debugPrint('Server-side logout failed: $e');
     }

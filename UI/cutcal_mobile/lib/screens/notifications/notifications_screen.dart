@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../providers/entity_providers.dart';
+import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/utils_widgets.dart';
 
@@ -19,6 +20,7 @@ class NotificationsScreen extends StatefulWidget {
 class _NotificationsScreenState extends State<NotificationsScreen> {
   List<NotificationModel> _notifications = [];
   bool _isLoading = true;
+  String? _loadError;
   Timer? _pollTimer;
 
   @override
@@ -36,13 +38,30 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> _load({bool silent = false}) async {
-    if (!silent) setState(() => _isLoading = true);
-    final result = await context.read<NotificationProvider>().get(filter: {'pageSize': 50});
-    if (!mounted) return;
-    setState(() {
-      _notifications = result.items;
-      _isLoading = false;
-    });
+    if (!silent) {
+      setState(() {
+        _isLoading = true;
+        _loadError = null;
+      });
+    }
+    try {
+      final result = await context.read<NotificationProvider>().get(filter: {'pageSize': 50});
+      if (!mounted) return;
+      setState(() {
+        _notifications = result.items;
+        _isLoading = false;
+      });
+    } on ApiClientException catch (e) {
+      if (!mounted) return;
+      if (silent) {
+        debugPrint('Silent notifications refresh failed: ${e.message}');
+        return;
+      }
+      setState(() {
+        _loadError = e.message;
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -65,9 +84,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       ),
       body: _isLoading
           ? const LoadingIndicator()
-          : _notifications.isEmpty
-              ? const Center(child: Text('No notifications yet.'))
-              : ListView.builder(
+          : _loadError != null
+              ? ErrorState(message: _loadError!, onRetry: _load)
+              : _notifications.isEmpty
+                  ? const Center(child: Text('No notifications yet.'))
+                  : ListView.builder(
                   itemCount: _notifications.length,
                   itemBuilder: (context, index) {
                     final n = _notifications[index];

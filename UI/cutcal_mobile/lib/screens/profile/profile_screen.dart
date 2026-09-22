@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../providers/entity_providers.dart';
+import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/utils_widgets.dart';
 import '../auth/login_screen.dart';
@@ -22,6 +23,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _reviews = 0;
   int _saved = 0;
   bool _isLoading = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -30,25 +32,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _load() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+
     final userId = context.read<AuthProvider>().userId;
     final appointments = context.read<AppointmentProvider>();
     final reviews = context.read<ReviewProvider>();
     final favorites = context.read<FavoriteProvider>();
 
-    final visitsFuture = appointments.get(filter: {'customerId': userId, 'status': 'Completed', 'pageSize': 1});
-    final reviewsFuture = reviews.get(filter: {'customerId': userId, 'pageSize': 1});
-    final savedFuture = favorites.getMine();
+    try {
+      final visitsFuture = appointments.get(filter: {'customerId': userId, 'status': 'Completed', 'pageSize': 1});
+      final reviewsFuture = reviews.get(filter: {'customerId': userId, 'pageSize': 1});
+      final savedFuture = favorites.getMine();
 
-    final visitsResult = await visitsFuture;
-    final reviewsResult = await reviewsFuture;
-    final savedResult = await savedFuture;
-    if (!mounted) return;
-    setState(() {
-      _visits = visitsResult.totalCount;
-      _reviews = reviewsResult.totalCount;
-      _saved = savedResult.length;
-      _isLoading = false;
-    });
+      final visitsResult = await visitsFuture;
+      final reviewsResult = await reviewsFuture;
+      final savedResult = await savedFuture;
+      if (!mounted) return;
+      setState(() {
+        _visits = visitsResult.totalCount;
+        _reviews = reviewsResult.totalCount;
+        _saved = savedResult.length;
+        _isLoading = false;
+      });
+    } on ApiClientException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = e.message;
+        _isLoading = false;
+      });
+    }
   }
 
   String get _initials {
@@ -123,17 +138,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                _isLoading
-                    ? const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: LoadingIndicator())
-                    : Row(
-                        children: [
-                          Expanded(child: _StatColumn(value: _visits, label: 'Visits')),
-                          _statDivider(),
-                          Expanded(child: _StatColumn(value: _reviews, label: 'Reviews')),
-                          _statDivider(),
-                          Expanded(child: _StatColumn(value: _saved, label: 'Saved')),
-                        ],
-                      ),
+                if (_isLoading)
+                  const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: LoadingIndicator())
+                else if (_loadError != null)
+                  Column(
+                    children: [
+                      Text(_loadError!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary)),
+                      const SizedBox(height: 8),
+                      OutlinedButton(onPressed: _load, child: const Text('Try again')),
+                    ],
+                  )
+                else
+                  Row(
+                    children: [
+                      Expanded(child: _StatColumn(value: _visits, label: 'Visits')),
+                      _statDivider(),
+                      Expanded(child: _StatColumn(value: _reviews, label: 'Reviews')),
+                      _statDivider(),
+                      Expanded(child: _StatColumn(value: _saved, label: 'Saved')),
+                    ],
+                  ),
               ],
             ),
           ),

@@ -20,6 +20,7 @@ class _ManagerStaffScreenState extends State<ManagerStaffScreen> {
   List<SalonServiceModel> _services = [];
   List<StaffModel> _staff = [];
   bool _isLoading = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -28,23 +29,34 @@ class _ManagerStaffScreenState extends State<ManagerStaffScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _isLoading = true);
-    // All three are auto-scoped server-side to salons this manager owns, and
-    // independent of each other, so they're fetched concurrently.
-    final salonsFuture = context.read<SalonProvider>().get(filter: {'pageSize': 20});
-    final servicesFuture = context.read<SalonServiceProvider>().get(filter: {'pageSize': 200});
-    final staffFuture = context.read<StaffProvider>().get(filter: {'pageSize': 200});
-
-    final salons = await salonsFuture;
-    final services = await servicesFuture;
-    final staff = await staffFuture;
-    if (!mounted) return;
     setState(() {
-      _salons = salons.items;
-      _services = services.items;
-      _staff = staff.items;
-      _isLoading = false;
+      _isLoading = true;
+      _loadError = null;
     });
+    try {
+      // All three are auto-scoped server-side to salons this manager owns, and
+      // independent of each other, so they're fetched concurrently.
+      final salonsFuture = context.read<SalonProvider>().get(filter: {'pageSize': 20});
+      final servicesFuture = context.read<SalonServiceProvider>().get(filter: {'pageSize': 200});
+      final staffFuture = context.read<StaffProvider>().get(filter: {'pageSize': 200});
+
+      final salons = await salonsFuture;
+      final services = await servicesFuture;
+      final staff = await staffFuture;
+      if (!mounted) return;
+      setState(() {
+        _salons = salons.items;
+        _services = services.items;
+        _staff = staff.items;
+        _isLoading = false;
+      });
+    } on ApiClientException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = e.message;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _openAddForm() async {
@@ -161,9 +173,11 @@ class _ManagerStaffScreenState extends State<ManagerStaffScreen> {
       ),
       body: _isLoading
           ? const LoadingIndicator()
-          : _staff.isEmpty
-              ? const Center(child: Text('No staff yet. Tap + to add one.', style: TextStyle(color: AppColors.textSecondary)))
-              : ListView.separated(
+          : _loadError != null
+              ? ErrorState(message: _loadError!, onRetry: _load)
+              : _staff.isEmpty
+                  ? const Center(child: Text('No staff yet. Tap + to add one.', style: TextStyle(color: AppColors.textSecondary)))
+                  : ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: _staff.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
