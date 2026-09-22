@@ -92,6 +92,10 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
         {
             query = query.Where(x => x.StateName == search.Status);
         }
+        if (!string.IsNullOrWhiteSpace(search.PaymentStatus))
+        {
+            query = query.Where(x => x.PaymentStatus == search.PaymentStatus);
+        }
         if (search.DateFrom.HasValue)
         {
             query = query.Where(x => x.ScheduledAt >= search.DateFrom.Value);

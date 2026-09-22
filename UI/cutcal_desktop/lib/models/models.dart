@@ -263,6 +263,8 @@ class AppointmentModel {
   final String paymentMethod;
   final String paymentStatus;
   final bool isPaid;
+  final String? paypalOrderId;
+  final String? paypalCaptureId;
   final String? cancellationReason;
   final bool hasReview;
 
@@ -283,6 +285,8 @@ class AppointmentModel {
     required this.paymentMethod,
     required this.paymentStatus,
     this.isPaid = false,
+    this.paypalOrderId,
+    this.paypalCaptureId,
     this.cancellationReason,
     this.hasReview = false,
   });
@@ -304,6 +308,8 @@ class AppointmentModel {
         paymentMethod: json['paymentMethod'] ?? 'Cash',
         paymentStatus: json['paymentStatus'] ?? 'Unpaid',
         isPaid: json['isPaid'] ?? false,
+        paypalOrderId: json['paypalOrderId'],
+        paypalCaptureId: json['paypalCaptureId'],
         cancellationReason: json['cancellationReason'],
         hasReview: json['hasReview'] ?? false,
       );

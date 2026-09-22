@@ -64,6 +64,12 @@ class StatusBadge extends StatelessWidget {
         return Colors.green;
       case 'Cancelled':
         return Colors.red;
+      case 'Paid':
+        return Colors.green;
+      case 'Unpaid':
+        return Colors.orange;
+      case 'Refunded':
+        return Colors.blueGrey;
       default:
         return Colors.grey;
     }

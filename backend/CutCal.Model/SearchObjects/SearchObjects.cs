@@ -52,6 +52,7 @@ public class AppointmentSearchObject : BaseSearchObject
     public int? SalonId { get; set; }
     public int? StaffId { get; set; }
     public string? Status { get; set; }
+    public string? PaymentStatus { get; set; }
     public DateTime? DateFrom { get; set; }
     public DateTime? DateTo { get; set; }
 }

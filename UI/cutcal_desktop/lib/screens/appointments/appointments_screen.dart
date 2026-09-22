@@ -20,6 +20,7 @@ class AppointmentsScreen extends StatefulWidget {
 class _AppointmentsScreenState extends State<AppointmentsScreen> {
   final _customerNameController = TextEditingController();
   String? _status;
+  String? _paymentStatus;
   DateTime? _dateFrom;
   DateTime? _dateTo;
   List<AppointmentModel> _appointments = [];
@@ -50,6 +51,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
       'page': _page,
       'pageSize': _pageSize,
       'status': _status,
+      'paymentStatus': _paymentStatus,
       'dateFrom': _dateFrom?.toIso8601String(),
       'dateTo': _dateTo?.toIso8601String(),
     });
@@ -149,6 +151,47 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     }
   }
 
+  void _showPaymentDetails(AppointmentModel a) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Payment details'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _detailRow('Method', a.paymentMethod),
+            _detailRow('Status', a.paymentStatus),
+            _detailRow('Amount', '\$${a.price.toStringAsFixed(2)}'),
+            if (a.paypalOrderId != null) _detailRow('PayPal order ID', a.paypalOrderId!),
+            if (a.paypalCaptureId != null) _detailRow('PayPal capture ID', a.paypalCaptureId!),
+            if (a.paymentMethod == 'PayPal' && a.paypalOrderId == null)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text('No PayPal order has been created for this appointment yet.', style: TextStyle(color: Colors.grey)),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Close')),
+        ],
+      ),
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 130, child: Text(label, style: const TextStyle(color: Colors.grey))),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -187,6 +230,23 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                   },
                 ),
               ),
+              SizedBox(
+                width: 180,
+                child: DropdownButtonFormField<String?>(
+                  initialValue: _paymentStatus,
+                  decoration: const InputDecoration(labelText: 'Payment', border: OutlineInputBorder(), isDense: true),
+                  items: const [
+                    DropdownMenuItem(value: null, child: Text('All')),
+                    DropdownMenuItem(value: 'Unpaid', child: Text('Unpaid')),
+                    DropdownMenuItem(value: 'Paid', child: Text('Paid')),
+                    DropdownMenuItem(value: 'Refunded', child: Text('Refunded')),
+                  ],
+                  onChanged: (v) {
+                    setState(() => _paymentStatus = v);
+                    _load();
+                  },
+                ),
+              ),
               OutlinedButton.icon(
                 icon: const Icon(Icons.date_range),
                 label: Text(_dateFrom == null ? 'From date' : DateFormat('MMM d').format(_dateFrom!)),
@@ -214,6 +274,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                         DataColumn(label: Text('Date')),
                         DataColumn(label: Text('Status')),
                         DataColumn(label: Text('Price')),
+                        DataColumn(label: Text('Payment')),
                         DataColumn(label: Text('Actions')),
                       ],
                       rows: _appointments
@@ -225,6 +286,19 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                                 DataCell(Text(DateFormat('MMM d, HH:mm').format(a.scheduledAt))),
                                 DataCell(StatusBadge(status: a.stateName)),
                                 DataCell(Text('\$${a.price.toStringAsFixed(2)}')),
+                                DataCell(
+                                  InkWell(
+                                    onTap: () => _showPaymentDetails(a),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        StatusBadge(status: a.paymentStatus),
+                                        const SizedBox(width: 6),
+                                        Text(a.paymentMethod, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                                 DataCell(_actionsFor(a)),
                               ]))
                           .toList(),
