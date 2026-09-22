@@ -178,8 +178,8 @@ class _SalonListScreenState extends State<SalonListScreen> {
   }
 
   String get _initials {
-    final first = AuthProvider.accessTokenDecoded?['FirstName']?.toString() ?? '';
-    final last = AuthProvider.accessTokenDecoded?['LastName']?.toString() ?? '';
+    final first = AuthProvider.currentUser?.firstName ?? AuthProvider.accessTokenDecoded?['FirstName']?.toString() ?? '';
+    final last = AuthProvider.currentUser?.lastName ?? AuthProvider.accessTokenDecoded?['LastName']?.toString() ?? '';
     final initials = '${first.isNotEmpty ? first[0] : ''}${last.isNotEmpty ? last[0] : ''}';
     return initials.isEmpty ? '?' : initials.toUpperCase();
   }

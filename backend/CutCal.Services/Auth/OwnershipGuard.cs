@@ -28,4 +28,17 @@ public static class OwnershipGuard
             throw new ClientException("You do not manage this salon.");
         }
     }
+
+    /// <summary>
+    /// Throws unless the current user is an Admin or the account identified by <paramref name="targetUserId"/> itself.
+    /// Used so a customer/manager/staff account can view and edit only their own profile.
+    /// </summary>
+    public static void EnsureIsSelfOrAdmin(int targetUserId, IAuthenticatedUserAccessor user)
+    {
+        if (user.IsInRole(RoleNames.Admin) || user.UserId == targetUserId)
+        {
+            return;
+        }
+        throw new ClientException("You can only manage your own account.");
+    }
 }

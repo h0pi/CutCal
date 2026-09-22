@@ -276,6 +276,18 @@ class UserProvider extends BaseProvider<UserModel> {
     ));
     validateResponse(response, allowEmpty: true);
   }
+
+  Future<UserModel> uploadAvatar(int userId, List<int> bytes, String filename) async {
+    final uri = Uri.parse('${AuthProvider.baseUrl}Users/$userId/Avatar');
+    final request = http.MultipartRequest('POST', uri);
+    if (AuthProvider.accessToken != null) {
+      request.headers['Authorization'] = 'Bearer ${AuthProvider.accessToken}';
+    }
+    request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+    final response = await sendRequest(request.send().then(http.Response.fromStream));
+    final data = validateResponse(response);
+    return fromJson(data);
+  }
 }
 
 class GeocodingProvider extends BaseProvider<GeocodeResultModel> {

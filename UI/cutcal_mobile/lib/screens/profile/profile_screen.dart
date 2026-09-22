@@ -5,6 +5,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/entity_providers.dart';
 import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/image_url.dart';
 import '../../utils/utils_widgets.dart';
 import '../auth/login_screen.dart';
 import '../notifications/notifications_screen.dart';
@@ -66,23 +67,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  // AuthProvider.currentUser reflects edits made in Profile settings without a
+  // re-login; the JWT claims are a fallback for the moment right after login,
+  // before the first build reads currentUser.
+  String get _firstName => AuthProvider.currentUser?.firstName ?? (AuthProvider.accessTokenDecoded?['FirstName'] as String?)?.trim() ?? '';
+  String get _lastName => AuthProvider.currentUser?.lastName ?? (AuthProvider.accessTokenDecoded?['LastName'] as String?)?.trim() ?? '';
+
   String get _initials {
-    final claims = AuthProvider.accessTokenDecoded;
-    final first = (claims?['FirstName'] as String?)?.trim() ?? '';
-    final last = (claims?['LastName'] as String?)?.trim() ?? '';
-    final initials = '${first.isNotEmpty ? first[0] : ''}${last.isNotEmpty ? last[0] : ''}';
+    final initials = '${_firstName.isNotEmpty ? _firstName[0] : ''}${_lastName.isNotEmpty ? _lastName[0] : ''}';
     return initials.isEmpty ? '?' : initials.toUpperCase();
   }
 
   String get _fullName {
-    final claims = AuthProvider.accessTokenDecoded;
-    final first = (claims?['FirstName'] as String?)?.trim() ?? '';
-    final last = (claims?['LastName'] as String?)?.trim() ?? '';
-    final name = '$first $last'.trim();
+    final name = '$_firstName $_lastName'.trim();
     return name.isEmpty ? 'My account' : name;
   }
 
-  String get _email => (AuthProvider.accessTokenDecoded?['Email'] as String?) ?? '';
+  String get _email => AuthProvider.currentUser?.email ?? (AuthProvider.accessTokenDecoded?['Email'] as String?) ?? '';
 
   Future<void> _logout(BuildContext context) async {
     final confirmed = await showConfirmationDialog(
@@ -122,7 +123,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     CircleAvatar(
                       radius: 32,
                       backgroundColor: AppColors.primaryLight,
-                      child: Text(_initials, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
+                      backgroundImage: AuthProvider.currentUser?.profileImageUrl != null
+                          ? NetworkImage(resolveImageUrl(AuthProvider.currentUser!.profileImageUrl!))
+                          : null,
+                      child: AuthProvider.currentUser?.profileImageUrl == null
+                          ? Text(_initials, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primaryDark))
+                          : null,
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -166,7 +172,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _SettingsTile(
               icon: Icons.settings_outlined,
               label: 'Profile settings',
-              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfileSettingsScreen())),
+              onTap: () async {
+                await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfileSettingsScreen()));
+                if (mounted) setState(() {});
+              },
             ),
             _SettingsTile(
               icon: Icons.favorite_outline,

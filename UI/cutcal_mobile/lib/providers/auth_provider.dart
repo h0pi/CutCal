@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:jwt_decoder/jwt_decoder.dart';
 
+import '../models/models.dart';
 import '../utils/api_client_exception.dart';
 
 class AuthProvider with ChangeNotifier {
@@ -16,6 +17,12 @@ class AuthProvider with ChangeNotifier {
   static String? accessToken;
   static String? refreshToken;
   static Map<String, dynamic>? accessTokenDecoded;
+
+  /// The logged-in user's profile as returned by the server, kept in sync with
+  /// edits made in Profile settings so the rest of the app (name, avatar) doesn't
+  /// need a re-login to see them — unlike accessTokenDecoded, which is frozen
+  /// at login time since it comes from the JWT.
+  static UserModel? currentUser;
 
   static const _roleClaimUri = 'http://schemas.microsoft.com/ws/2008/06/identity/claims/role';
 
@@ -102,6 +109,14 @@ class AuthProvider with ChangeNotifier {
     accessToken = json['accessToken'];
     refreshToken = json['refreshToken'];
     accessTokenDecoded = JwtDecoder.decode(accessToken!);
+    if (json['user'] != null) currentUser = UserModel.fromJson(json['user']);
+  }
+
+  /// Called after Profile settings saves changes, so the new name/avatar show up
+  /// immediately without waiting for the next login.
+  void updateCurrentUser(UserModel updated) {
+    currentUser = updated;
+    notifyListeners();
   }
 
   /// Ends the session locally right away, then tells the server to invalidate the tokens.
@@ -126,6 +141,7 @@ class AuthProvider with ChangeNotifier {
     accessToken = null;
     refreshToken = null;
     accessTokenDecoded = null;
+    currentUser = null;
     notifyListeners();
   }
 
