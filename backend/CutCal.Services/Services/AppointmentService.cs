@@ -12,6 +12,7 @@ using CutCal.Services.Messaging;
 using CutCal.Services.StateMachine;
 using Mapster;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace CutCal.Services.Services;
 
@@ -30,16 +31,22 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
     private readonly IRabbitMqPublisher _publisher;
     private readonly INotificationService _notificationService;
     private readonly IAuthenticatedUserAccessor _userAccessor;
+    private readonly IPaymentService _paymentService;
+    private readonly ILogger<AppointmentService> _logger;
 
     public AppointmentService(
         CutCalDbContext context,
         IRabbitMqPublisher publisher,
         INotificationService notificationService,
-        IAuthenticatedUserAccessor userAccessor) : base(context)
+        IAuthenticatedUserAccessor userAccessor,
+        IPaymentService paymentService,
+        ILogger<AppointmentService> logger) : base(context)
     {
         _publisher = publisher;
         _notificationService = notificationService;
         _userAccessor = userAccessor;
+        _paymentService = paymentService;
+        _logger = logger;
     }
 
     protected override IQueryable<Appointment> AddInclude(IQueryable<Appointment> query)
@@ -254,11 +261,26 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
         }
 
         var appointment = await LoadForChangeAsync(id);
+        var wasPaid = appointment.PaymentStatus == PaymentStatusNames.Paid;
         GetState(appointment.StateName).Cancel(appointment, reason);
 
         _notificationService.Add(appointment.CustomerId, "Appointment cancelled",
             $"Your appointment at {appointment.Salon.Name} on {appointment.ScheduledAt:g} was cancelled. Reason: {reason}", nameof(NotificationType.AppointmentCancelled));
         await Context.SaveChangesAsync();
+
+        if (wasPaid)
+        {
+            try
+            {
+                await _paymentService.RefundAsync(id);
+            }
+            catch (Exception ex)
+            {
+                // The cancellation itself already succeeded and must not be rolled back for a refund
+                // failure; an Admin/Manager can still trigger Payments/Refund/{id} manually afterwards.
+                _logger.LogError(ex, "Automatic refund failed for cancelled appointment {AppointmentId}; needs a manual refund.", id);
+            }
+        }
 
         await _publisher.PublishAsync(BuildMessage(NotificationMessageTypes.AppointmentCancelled, appointment, reason));
 

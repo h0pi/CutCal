@@ -2,6 +2,7 @@ using CutCal.Messaging;
 using CutCal.Model.Constants;
 using CutCal.Model.Exceptions;
 using CutCal.Model.Responses;
+using CutCal.Services.Auth;
 using CutCal.Services.Database;
 using CutCal.Services.Messaging;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +26,7 @@ public class PaymentService : IPaymentService
     private readonly CutCalDbContext _context;
     private readonly IRabbitMqPublisher _publisher;
     private readonly INotificationService _notificationService;
+    private readonly IAuthenticatedUserAccessor _userAccessor;
     private readonly ILogger<PaymentService> _logger;
     private readonly PayPalHttpClient _client;
 
@@ -32,15 +34,21 @@ public class PaymentService : IPaymentService
         CutCalDbContext context,
         IRabbitMqPublisher publisher,
         INotificationService notificationService,
+        IAuthenticatedUserAccessor userAccessor,
         ILogger<PaymentService> logger)
     {
         _context = context;
         _publisher = publisher;
         _notificationService = notificationService;
+        _userAccessor = userAccessor;
         _logger = logger;
 
-        var clientId = System.Environment.GetEnvironmentVariable("PayPal__ClientId") ?? "sandbox-client-id";
-        var clientSecret = System.Environment.GetEnvironmentVariable("PayPal__ClientSecret") ?? "sandbox-secret";
+        var clientId = System.Environment.GetEnvironmentVariable("PayPal__ClientId");
+        var clientSecret = System.Environment.GetEnvironmentVariable("PayPal__ClientSecret");
+        if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
+        {
+            throw new InvalidOperationException("PayPal__ClientId / PayPal__ClientSecret are not configured. Set them in .env.");
+        }
         PayPalEnvironment environment = new SandboxEnvironment(clientId, clientSecret);
         _client = new PayPalHttpClient(environment);
     }
@@ -49,6 +57,7 @@ public class PaymentService : IPaymentService
     {
         var appointment = await _context.Appointments.Include(x => x.Payment).FirstOrDefaultAsync(x => x.Id == appointmentId)
             ?? throw new ClientException("Appointment not found.");
+        OwnershipGuard.EnsureIsSelfOrAdmin(appointment.CustomerId, _userAccessor);
 
         if (appointment.Payment is { Status: PaymentStatusNames.Paid })
         {
@@ -69,6 +78,15 @@ public class PaymentService : IPaymentService
                     },
                     ReferenceId = appointmentId.ToString()
                 }
+            },
+            // The mobile app's WebView watches for navigation to these URLs to know when the
+            // customer has approved or cancelled the payment on PayPal's own approval page.
+            ApplicationContext = new ApplicationContext
+            {
+                BrandName = "CutCal",
+                UserAction = "PAY_NOW",
+                ReturnUrl = "https://cutcal.app/paypal/return",
+                CancelUrl = "https://cutcal.app/paypal/cancel"
             }
         };
 
@@ -108,10 +126,16 @@ public class PaymentService : IPaymentService
     {
         var appointment = await _context.Appointments.Include(x => x.Payment).Include(x => x.Salon).Include(x => x.Customer).FirstOrDefaultAsync(x => x.Id == appointmentId)
             ?? throw new ClientException("Appointment not found.");
+        OwnershipGuard.EnsureIsSelfOrAdmin(appointment.CustomerId, _userAccessor);
 
         if (appointment.Payment is { Status: PaymentStatusNames.Paid })
         {
             return MapPaymentResponse(appointment.Payment);
+        }
+
+        if (appointment.PaypalOrderId != paypalOrderId)
+        {
+            throw new ClientException("This PayPal order does not belong to this appointment.");
         }
 
         var request = new OrdersCaptureRequest(paypalOrderId);

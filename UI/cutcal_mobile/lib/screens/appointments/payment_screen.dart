@@ -7,6 +7,7 @@ import '../../providers/entity_providers.dart';
 import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/utils_widgets.dart';
+import 'paypal_webview_screen.dart';
 
 class PaymentScreen extends StatefulWidget {
   final SalonModel salon;
@@ -81,9 +82,25 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
       final paymentProvider = context.read<PaymentProvider>();
       final order = await paymentProvider.createOrder(appointment.id);
-      // TODO: open order['approvalUrl'] in an in-app PayPal WebView/SDK flow and
-      // return the resulting orderId here, rather than capturing immediately.
-      await paymentProvider.captureOrder(order['orderId'], appointment.id);
+      final approvalUrl = order['approvalUrl'] as String?;
+      if (approvalUrl == null || approvalUrl.isEmpty) {
+        throw ApiClientException('PayPal did not return an approval link. Please try again.');
+      }
+
+      if (!mounted) return;
+      final approvedToken = await Navigator.of(context).push<String?>(
+        MaterialPageRoute(builder: (_) => PayPalWebViewScreen(approvalUrl: approvalUrl)),
+      );
+
+      if (approvedToken == null) {
+        if (mounted) {
+          showErrorSnackBar(context, 'Payment was not completed. Your appointment is booked but still unpaid — try again from your bookings.');
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+        return;
+      }
+
+      await paymentProvider.captureOrder(order['orderId'] as String, appointment.id);
 
       if (mounted) {
         showSuccessSnackBar(context, 'Payment successful! Appointment booked for ${DateFormat('MMM d, y • HH:mm').format(widget.scheduledAt)}.');
