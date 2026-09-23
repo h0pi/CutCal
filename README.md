@@ -78,6 +78,7 @@ Every seeded account uses the password `test`.
 | Više korisničkih uloga: SalonManager (Business Mode u mobilnoj) | `manager` | `test` |
 | Više korisničkih uloga: Customer | `customer` | `test` |
 | Više korisničkih uloga: Staff | `staff1` | `test` |
+| PayPal sandbox test kupac (za plaćanje termina u mobilnoj app) | `sb-tmzjs52890786@personal.example.com` | `8E#QQuao` |
 
 Logging out invalidates the access token on the server (it is blacklisted until it would have expired) and deletes the refresh token, so a token copied before logout stops working.
 
@@ -85,6 +86,6 @@ Logging out invalidates the access token on the server (it is blacklisted until 
 
 - Notifications are refreshed by polling (`GET /Notifications`), not SignalR.
 - Server-side validation: every request object has a FluentValidation validator that runs before the action; errors state the expected format (for example the phone number pattern) and are shown to the user.
-- Recommender: see `recommender-dokumentacija.md`.
+- Recommender: see `recommender-dokumentacija.pdf`.
 - Demo data: 15 salons (3 per category, across Sarajevo, Mostar, Banja Luka, Zagreb and Belgrade) with photos, 30 staff members (`staff1`..`staff30`), 11 customers (`customer`, `customer2`..`customer10`, plus `mobile`), about 140 historic appointments with 90 reviews (salon ratings are the real average of their reviews), and every salon is topped up to three upcoming appointments each time the API starts. All seeded accounts use the password `test`.
 - Salon and staff images are served by the API from `wwwroot/images` (credits in `wwwroot/images/CREDITS.md`).
