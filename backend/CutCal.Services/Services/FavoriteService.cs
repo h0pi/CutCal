@@ -1,3 +1,4 @@
+using CutCal.Model.Common;
 using CutCal.Model.Responses;
 using CutCal.Services.Database;
 using Mapster;
@@ -23,7 +24,14 @@ public class FavoriteService : IFavoriteService
 
     public async Task<List<FavoriteResponse>> GetForUserAsync(int userId)
     {
-        var favorites = await _context.Favorites.Include(x => x.Salon).Where(x => x.UserId == userId).ToListAsync();
+        // Not paginated (the client just renders a flat "your favorites" list), but still capped
+        // server-side so a single user can never make this endpoint return an unbounded payload.
+        var favorites = await _context.Favorites
+            .Include(x => x.Salon)
+            .Where(x => x.UserId == userId)
+            .OrderByDescending(x => x.SavedAt)
+            .Take(BaseSearchObject.MaxPageSize)
+            .ToListAsync();
         return favorites.Adapt<List<FavoriteResponse>>();
     }
 

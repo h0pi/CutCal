@@ -77,6 +77,10 @@ public class UsersController : BaseCRUDController<UserResponse, UserSearchObject
         {
             throw new ClientException("Only JPEG, PNG or WEBP images are allowed.");
         }
+        if (!await HasValidImageSignatureAsync(file, extension))
+        {
+            throw new ClientException("The uploaded file is not a valid JPEG, PNG or WEBP image.");
+        }
 
         var avatarsDir = Path.Combine(_env.WebRootPath, "images", "avatars");
         Directory.CreateDirectory(avatarsDir);
@@ -92,5 +96,26 @@ public class UsersController : BaseCRUDController<UserResponse, UserSearchObject
         }
 
         return Ok(await Service.SetAvatarUrlAsync(id, $"/images/avatars/{id}{extension}"));
+    }
+
+    /// <summary>
+    /// The Content-Type header is client-supplied and trivially spoofable, so this checks the
+    /// file's actual magic bytes against the format its extension claims to be.
+    /// </summary>
+    private static async Task<bool> HasValidImageSignatureAsync(IFormFile file, string extension)
+    {
+        var header = new byte[12];
+        await using var stream = file.OpenReadStream();
+        var read = await stream.ReadAsync(header.AsMemory(0, header.Length));
+
+        return extension switch
+        {
+            ".jpg" => read >= 3 && header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF,
+            ".png" => read >= 8 && header[0] == 0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47
+                                 && header[4] == 0x0D && header[5] == 0x0A && header[6] == 0x1A && header[7] == 0x0A,
+            ".webp" => read >= 12 && header[0] == 0x52 && header[1] == 0x49 && header[2] == 0x46 && header[3] == 0x46
+                                   && header[8] == 0x57 && header[9] == 0x45 && header[10] == 0x42 && header[11] == 0x50,
+            _ => false
+        };
     }
 }

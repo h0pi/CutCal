@@ -192,6 +192,9 @@ public class Appointment
     public string? PaypalOrderId { get; set; }
     public string? PaypalCaptureId { get; set; }
     public string? CancellationReason { get; set; }
+    public int? CancelledById { get; set; }
+    public User? CancelledBy { get; set; }
+    public DateTime? CancelledAt { get; set; }
     public int? ApprovedById { get; set; }
     public User? ApprovedBy { get; set; }
     public DateTime? ApprovedAt { get; set; }

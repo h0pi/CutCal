@@ -135,6 +135,8 @@ public class AppointmentResponse
     public string? PaypalOrderId { get; set; }
     public string? PaypalCaptureId { get; set; }
     public string? CancellationReason { get; set; }
+    public int? CancelledById { get; set; }
+    public DateTime? CancelledAt { get; set; }
     public int? ApprovedById { get; set; }
     public DateTime? ApprovedAt { get; set; }
     public DateTime CreatedAt { get; set; }

@@ -13,7 +13,7 @@ public abstract class BaseAppointmentState
         throw new ClientException($"Appointment in state '{Name}' cannot be confirmed.");
     }
 
-    public virtual void Cancel(Appointment appointment, string reason)
+    public virtual void Cancel(Appointment appointment, string reason, int cancelledById)
     {
         throw new ClientException($"Appointment in state '{Name}' cannot be cancelled.");
     }
@@ -35,10 +35,12 @@ public class PendingAppointmentState : BaseAppointmentState
         appointment.ApprovedAt = DateTime.UtcNow;
     }
 
-    public override void Cancel(Appointment appointment, string reason)
+    public override void Cancel(Appointment appointment, string reason, int cancelledById)
     {
         appointment.StateName = AppointmentStateNames.Cancelled;
         appointment.CancellationReason = reason;
+        appointment.CancelledById = cancelledById;
+        appointment.CancelledAt = DateTime.UtcNow;
     }
 }
 
@@ -51,10 +53,12 @@ public class ConfirmedAppointmentState : BaseAppointmentState
         appointment.StateName = AppointmentStateNames.Completed;
     }
 
-    public override void Cancel(Appointment appointment, string reason)
+    public override void Cancel(Appointment appointment, string reason, int cancelledById)
     {
         appointment.StateName = AppointmentStateNames.Cancelled;
         appointment.CancellationReason = reason;
+        appointment.CancelledById = cancelledById;
+        appointment.CancelledAt = DateTime.UtcNow;
     }
 }
 

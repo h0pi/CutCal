@@ -262,7 +262,7 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
 
         var appointment = await LoadForChangeAsync(id);
         var wasPaid = appointment.PaymentStatus == PaymentStatusNames.Paid;
-        GetState(appointment.StateName).Cancel(appointment, reason);
+        GetState(appointment.StateName).Cancel(appointment, reason, userId);
 
         _notificationService.Add(appointment.CustomerId, "Appointment cancelled",
             $"Your appointment at {appointment.Salon.Name} on {appointment.ScheduledAt:g} was cancelled. Reason: {reason}", nameof(NotificationType.AppointmentCancelled));

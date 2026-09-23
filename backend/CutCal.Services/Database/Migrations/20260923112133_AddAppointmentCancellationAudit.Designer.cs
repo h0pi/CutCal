@@ -4,6 +4,7 @@ using CutCal.Services.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CutCal.Services.Database.Migrations
 {
     [DbContext(typeof(CutCalDbContext))]
-    partial class CutCalDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260923112133_AddAppointmentCancellationAudit")]
+    partial class AddAppointmentCancellationAudit
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
