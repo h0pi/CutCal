@@ -62,6 +62,7 @@ builder.Services.AddScoped<ITokenRevocationService, TokenRevocationService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ISalonService, SalonManagementService>();
 builder.Services.AddScoped<ISalonCategoryService, SalonCategoryService>();
+builder.Services.AddScoped<ICountryService, CountryService>();
 builder.Services.AddScoped<ICityService, CityService>();
 builder.Services.AddScoped<ISalonServiceService, SalonServiceService>();
 builder.Services.AddScoped<IStaffService, StaffManagementService>();

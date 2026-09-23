@@ -10,6 +10,7 @@ namespace CutCal.Services.Services;
 public interface IGeocodingService
 {
     Task<List<GeocodeResultResponse>> SearchAsync(string query);
+    Task<GeocodeResultResponse> ReverseAsync(double latitude, double longitude);
 }
 
 /// <summary>Turns a typed address into coordinates using OpenStreetMap Nominatim.</summary>
@@ -72,6 +73,41 @@ public class GeocodingService : IGeocodingService
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or KeyNotFoundException)
         {
             _logger.LogError(ex, "Geocoding lookup failed for query '{Query}'", trimmed);
+            throw new ClientException("Address lookup is temporarily unavailable. Please try again in a moment.");
+        }
+    }
+
+    public async Task<GeocodeResultResponse> ReverseAsync(double latitude, double longitude)
+    {
+        var cacheKey = $"reverse:{latitude.ToString(CultureInfo.InvariantCulture)},{longitude.ToString(CultureInfo.InvariantCulture)}";
+        if (_cache.TryGetValue(cacheKey, out GeocodeResultResponse? cached) && cached is not null)
+        {
+            return cached;
+        }
+
+        var client = _httpClientFactory.CreateClient(HttpClientName);
+        var url = $"reverse?format=json&lat={latitude.ToString(CultureInfo.InvariantCulture)}&lon={longitude.ToString(CultureInfo.InvariantCulture)}";
+
+        try
+        {
+            using var response = await client.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+            await using var stream = await response.Content.ReadAsStreamAsync();
+            using var document = await JsonDocument.ParseAsync(stream);
+
+            var result = new GeocodeResultResponse
+            {
+                DisplayName = document.RootElement.TryGetProperty("display_name", out var name) ? name.GetString() ?? "Unknown location" : "Unknown location",
+                Latitude = latitude,
+                Longitude = longitude
+            };
+
+            _cache.Set(cacheKey, result, CacheDuration);
+            return result;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or KeyNotFoundException)
+        {
+            _logger.LogError(ex, "Reverse geocoding lookup failed for ({Lat}, {Lon})", latitude, longitude);
             throw new ClientException("Address lookup is temporarily unavailable. Please try again in a moment.");
         }
     }

@@ -16,6 +16,7 @@ public interface IUserService : IBaseCRUDService<UserResponse, UserSearchObject,
 {
     Task ChangePasswordAsync(int userId, ChangePasswordRequest request);
     Task<UserResponse> SetAvatarUrlAsync(int userId, string profileImageUrl);
+    Task<UserResponse> SetRoleAsync(int userId, string role);
     Task<User?> GetByUsernameAsync(string username);
 }
 
@@ -64,6 +65,20 @@ public class UserService : BaseCRUDService<User, UserResponse, UserSearchObject,
         user.ProfileImageUrl = profileImageUrl;
         await Context.SaveChangesAsync();
         return user.Adapt<UserResponse>();
+    }
+
+    public async Task<UserResponse> SetRoleAsync(int userId, string role)
+    {
+        var user = await Context.Users.Include(x => x.UserRoles).FirstOrDefaultAsync(x => x.Id == userId)
+            ?? throw new ClientException("User not found.");
+        var roleEntity = await Context.Roles.FirstOrDefaultAsync(x => x.Name == role)
+            ?? throw new ClientException($"Role '{role}' does not exist.");
+
+        Context.UserRoles.RemoveRange(user.UserRoles);
+        Context.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = roleEntity.Id });
+        await Context.SaveChangesAsync();
+
+        return await GetByIdAsync(userId) ?? throw new ClientException("User not found.");
     }
 
     /// <summary>

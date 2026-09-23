@@ -5,6 +5,7 @@ import '../providers/auth_provider.dart';
 import '../screens/appointments/appointments_screen.dart';
 import '../screens/cities_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
+import '../screens/pending_salons_screen.dart';
 import '../screens/reports_screen.dart';
 import '../screens/reviews_screen.dart';
 import '../screens/salon_categories_screen.dart';
@@ -51,6 +52,12 @@ class _MasterScreenState extends State<MasterScreen> {
     _NavItem('Settings', Icons.settings, SettingsScreen()),
   ];
 
+  // Approving a new salon is Admin-only on the backend (SalonsController.Approve), so
+  // this screen is appended only for Admin logins rather than living in _adminItems.
+  static const _adminOnlyItems = [
+    _NavItem('Pending Salons', Icons.storefront_outlined, PendingSalonsScreen()),
+  ];
+
   // A staff login only ever needs to see the appointments assigned to them; the
   // backend already scopes Appointments/Get to the caller's own bookings for the
   // Staff role, so reusing the same screen here is enough — no separate widget.
@@ -58,7 +65,12 @@ class _MasterScreenState extends State<MasterScreen> {
     _NavItem('My Appointments', Icons.event_note, AppointmentsScreen()),
   ];
 
-  List<_NavItem> get _items => context.read<AuthProvider>().role == 'Staff' ? _staffItems : _adminItems;
+  List<_NavItem> get _items {
+    final role = context.read<AuthProvider>().role;
+    if (role == 'Staff') return _staffItems;
+    if (role == 'Admin') return [..._adminItems, ..._adminOnlyItems];
+    return _adminItems;
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -61,17 +61,33 @@ class SalonCategoryModel {
   Map<String, dynamic> toJson() => {'name': name};
 }
 
+class CountryModel {
+  final int id;
+  final String name;
+
+  CountryModel({required this.id, required this.name});
+
+  factory CountryModel.fromJson(Map<String, dynamic> json) => CountryModel(id: json['id'], name: json['name'] ?? '');
+
+  Map<String, dynamic> toJson() => {'name': name};
+}
+
 class CityModel {
   final int id;
   final String name;
-  final String country;
+  final int countryId;
+  final String? countryName;
 
-  CityModel({required this.id, required this.name, required this.country});
+  CityModel({required this.id, required this.name, required this.countryId, this.countryName});
 
-  factory CityModel.fromJson(Map<String, dynamic> json) =>
-      CityModel(id: json['id'], name: json['name'] ?? '', country: json['country'] ?? '');
+  factory CityModel.fromJson(Map<String, dynamic> json) => CityModel(
+        id: json['id'],
+        name: json['name'] ?? '',
+        countryId: json['countryId'] ?? 0,
+        countryName: json['countryName'],
+      );
 
-  Map<String, dynamic> toJson() => {'name': name, 'country': country};
+  Map<String, dynamic> toJson() => {'name': name, 'countryId': countryId};
 }
 
 class SalonWorkingHoursModel {
@@ -117,6 +133,7 @@ class SalonGalleryModel {
 
 class SalonModel {
   final int id;
+  final int ownerId;
   final String name;
   final int salonCategoryId;
   final String? salonCategoryName;
@@ -141,6 +158,7 @@ class SalonModel {
 
   SalonModel({
     required this.id,
+    this.ownerId = 0,
     required this.name,
     required this.salonCategoryId,
     this.salonCategoryName,
@@ -166,6 +184,7 @@ class SalonModel {
 
   factory SalonModel.fromJson(Map<String, dynamic> json) => SalonModel(
         id: json['id'],
+        ownerId: json['ownerId'] ?? 0,
         name: json['name'] ?? '',
         salonCategoryId: json['salonCategoryId'] ?? 0,
         salonCategoryName: json['salonCategoryName'],

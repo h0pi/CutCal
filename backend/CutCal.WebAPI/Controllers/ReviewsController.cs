@@ -45,7 +45,7 @@ public class ReviewsController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = RoleNames.Admin)]
+    [Authorize(Roles = RoleNames.AdminOrManager)]
     public async Task<IActionResult> Delete(int id)
     {
         await _service.RemoveAsync(id, _userAccessor.UserId);

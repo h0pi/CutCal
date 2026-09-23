@@ -54,6 +54,14 @@ class SalonCategoryProvider extends BaseProvider<SalonCategoryModel> {
   SalonCategoryModel fromJson(json) => SalonCategoryModel.fromJson(json);
 }
 
+class CountryProvider extends BaseProvider<CountryModel> {
+  @override
+  String getEndpoint() => 'Countries';
+
+  @override
+  CountryModel fromJson(json) => CountryModel.fromJson(json);
+}
+
 class CityProvider extends BaseProvider<CityModel> {
   @override
   String getEndpoint() => 'Cities';
@@ -87,6 +95,13 @@ class SalonProvider extends BaseProvider<SalonModel> {
     final uri = Uri.parse('${AuthProvider.baseUrl}Salons/$salonId/Gallery/$imageId');
     final response = await http.delete(uri, headers: createHeaders());
     validateResponse(response, allowEmpty: true);
+  }
+
+  Future<SalonModel> approve(int salonId) async {
+    final uri = Uri.parse('${AuthProvider.baseUrl}Salons/$salonId/Approve');
+    final response = await http.post(uri, headers: createHeaders());
+    final data = validateResponse(response);
+    return fromJson(data);
   }
 
   Future<SalonModel> setFeatured(int salonId, bool featured) async {
@@ -184,6 +199,13 @@ class UserProvider extends BaseProvider<UserModel> {
     );
     validateResponse(response, allowEmpty: true);
   }
+
+  Future<UserModel> setRole(int userId, String role) async {
+    final uri = Uri.parse('${AuthProvider.baseUrl}Users/$userId/Role');
+    final response = await http.put(uri, headers: createHeaders(), body: jsonEncode({'role': role}));
+    final data = validateResponse(response);
+    return fromJson(data);
+  }
 }
 
 class GeocodingProvider extends BaseProvider<GeocodeResultModel> {
@@ -198,5 +220,12 @@ class GeocodingProvider extends BaseProvider<GeocodeResultModel> {
     final response = await http.get(uri, headers: createHeaders());
     final data = validateResponse(response) as List;
     return data.map((e) => GeocodeResultModel.fromJson(e)).toList();
+  }
+
+  Future<GeocodeResultModel> reverse(double latitude, double longitude) async {
+    final uri = Uri.parse('${AuthProvider.baseUrl}Geocoding/Reverse${getQueryString({'lat': latitude, 'lon': longitude})}');
+    final response = await http.get(uri, headers: createHeaders());
+    final data = validateResponse(response);
+    return GeocodeResultModel.fromJson(data);
   }
 }

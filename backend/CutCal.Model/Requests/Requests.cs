@@ -48,6 +48,11 @@ public class UserUpdateRequest
     public bool IsActive { get; set; } = true;
 }
 
+public class UserRoleUpdateRequest
+{
+    public string Role { get; set; } = null!;
+}
+
 public class ChangePasswordRequest
 {
     public string OldPassword { get; set; } = null!;
@@ -119,16 +124,26 @@ public class SalonCategoryUpdateRequest
     public string Name { get; set; } = null!;
 }
 
+public class CountryInsertRequest
+{
+    public string Name { get; set; } = null!;
+}
+
+public class CountryUpdateRequest
+{
+    public string Name { get; set; } = null!;
+}
+
 public class CityInsertRequest
 {
     public string Name { get; set; } = null!;
-    public string Country { get; set; } = null!;
+    public int CountryId { get; set; }
 }
 
 public class CityUpdateRequest
 {
     public string Name { get; set; } = null!;
-    public string Country { get; set; } = null!;
+    public int CountryId { get; set; }
 }
 
 public class SalonServiceInsertRequest

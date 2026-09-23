@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../providers/entity_providers.dart';
+import '../utils/api_client_exception.dart';
 import '../utils/utils_widgets.dart';
 
 class CitiesScreen extends StatefulWidget {
@@ -15,6 +16,7 @@ class CitiesScreen extends StatefulWidget {
 class _CitiesScreenState extends State<CitiesScreen> {
   final _searchController = TextEditingController();
   List<CityModel> _cities = [];
+  List<CountryModel> _countries = [];
   bool _isLoading = true;
 
   @override
@@ -29,35 +31,92 @@ class _CitiesScreenState extends State<CitiesScreen> {
       'name': _searchController.text.isEmpty ? null : _searchController.text,
       'pageSize': 100,
     });
+    final countries = await context.read<CountryProvider>().get(filter: {'pageSize': 100});
     setState(() {
       _cities = result.items;
+      _countries = countries.items;
       _isLoading = false;
     });
   }
 
-  Future<void> _openForm({CityModel? city}) async {
-    final nameController = TextEditingController(text: city?.name);
-    final countryController = TextEditingController(text: city?.country);
-    final result = await showDialog<bool>(
+  Future<CountryModel?> _addCountry(StateSetter setDialogState) async {
+    final nameController = TextEditingController();
+    final name = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(city == null ? 'Add city' : 'Edit city'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Name')),
-            TextField(controller: countryController, decoration: const InputDecoration(labelText: 'Country')),
-          ],
-        ),
+        title: const Text('Add country'),
+        content: TextField(controller: nameController, autofocus: true, decoration: const InputDecoration(labelText: 'Country name')),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Save')),
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.of(context).pop(nameController.text), child: const Text('Add')),
         ],
       ),
     );
-    if (result != true || nameController.text.isEmpty) return;
+    if (name == null || name.trim().isEmpty) return null;
 
-    final request = {'name': nameController.text, 'country': countryController.text};
+    try {
+      final created = await context.read<CountryProvider>().insert({'name': name.trim()});
+      setDialogState(() => _countries = [..._countries, created]);
+      return created;
+    } on ApiClientException catch (e) {
+      if (mounted) showErrorSnackBar(context, e.message);
+      return null;
+    }
+  }
+
+  Future<void> _openForm({CityModel? city}) async {
+    final nameController = TextEditingController(text: city?.name);
+    int? countryId = city?.countryId ?? _countries.firstOrNull?.id;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(city == null ? 'Add city' : 'Edit city'),
+          content: SizedBox(
+            width: 360,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Name')),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<int>(
+                        initialValue: countryId,
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: 'Country'),
+                        items: _countries.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
+                        onChanged: (v) => setDialogState(() => countryId = v),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.add_circle_outline),
+                      tooltip: 'Add new country',
+                      onPressed: () async {
+                        final created = await _addCountry(setDialogState);
+                        if (created != null) setDialogState(() => countryId = created.id);
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: countryId == null ? null : () => Navigator.of(context).pop(true),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result != true || nameController.text.isEmpty || countryId == null) return;
+
+    final request = {'name': nameController.text, 'countryId': countryId};
     if (city == null) {
       await context.read<CityProvider>().insert(request);
     } else {
@@ -106,7 +165,7 @@ class _CitiesScreenState extends State<CitiesScreen> {
                       final c = _cities[index];
                       return ListTile(
                         title: Text(c.name),
-                        subtitle: Text(c.country),
+                        subtitle: Text(c.countryName ?? 'Unknown'),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [

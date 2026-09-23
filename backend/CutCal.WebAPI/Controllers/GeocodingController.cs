@@ -23,4 +23,10 @@ public class GeocodingController : ControllerBase
     {
         return Ok(await _service.SearchAsync(query));
     }
+
+    [HttpGet("Reverse")]
+    public async Task<ActionResult<GeocodeResultResponse>> Reverse([FromQuery] double lat, [FromQuery] double lon)
+    {
+        return Ok(await _service.ReverseAsync(lat, lon));
+    }
 }

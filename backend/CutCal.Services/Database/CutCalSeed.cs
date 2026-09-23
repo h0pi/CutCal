@@ -31,12 +31,18 @@ public static class CutCalSeed
             new SalonCategory { Id = 5, Name = "Spa" }
         );
 
+        modelBuilder.Entity<Country>().HasData(
+            new Country { Id = 1, Name = "BiH" },
+            new Country { Id = 2, Name = "HR" },
+            new Country { Id = 3, Name = "RS" }
+        );
+
         modelBuilder.Entity<City>().HasData(
-            new City { Id = 1, Name = "Sarajevo", Country = "BiH" },
-            new City { Id = 2, Name = "Mostar", Country = "BiH" },
-            new City { Id = 3, Name = "Banja Luka", Country = "BiH" },
-            new City { Id = 4, Name = "Zagreb", Country = "HR" },
-            new City { Id = 5, Name = "Beograd", Country = "RS" }
+            new City { Id = 1, Name = "Sarajevo", CountryId = 1 },
+            new City { Id = 2, Name = "Mostar", CountryId = 1 },
+            new City { Id = 3, Name = "Banja Luka", CountryId = 1 },
+            new City { Id = 4, Name = "Zagreb", CountryId = 2 },
+            new City { Id = 5, Name = "Beograd", CountryId = 3 }
         );
 
         var users = new List<User>

@@ -16,6 +16,7 @@ public class CutCalDbContext : DbContext
     public DbSet<SalonWorkingHours> SalonWorkingHours => Set<SalonWorkingHours>();
     public DbSet<SalonGallery> SalonGalleries => Set<SalonGallery>();
     public DbSet<SalonCategory> SalonCategories => Set<SalonCategory>();
+    public DbSet<Country> Countries => Set<Country>();
     public DbSet<City> Cities => Set<City>();
     public DbSet<SalonService> SalonServices => Set<SalonService>();
     public DbSet<Staff> Staff => Set<Staff>();

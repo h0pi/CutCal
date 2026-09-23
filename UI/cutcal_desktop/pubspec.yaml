@@ -37,10 +37,12 @@ dependencies:
   provider: ^6.1.5+1
   http: ^1.6.0
   jwt_decoder: ^2.0.1
-  # google_maps_flutter / image_picker have no native Windows desktop implementation;
-  # kept for API-shape parity with mobile, actual UI uses TODO placeholders on desktop.
   intl: ^0.20.0
   path_provider: ^2.1.6
+  # google_maps_flutter has no native Windows desktop implementation. flutter_map with
+  # OSM tiles does support desktop and matches the backend's Nominatim-based geocoding.
+  flutter_map: ^8.1.1
+  latlong2: ^0.9.1
 
 dev_dependencies:
   flutter_test:

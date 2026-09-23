@@ -16,6 +16,7 @@ class StaffScreen extends StatefulWidget {
 class _StaffScreenState extends State<StaffScreen> {
   final _nameController = TextEditingController();
   List<SalonModel> _salons = [];
+  List<UserModel> _allUsers = [];
   int? _salonId;
   List<StaffModel> _staff = [];
   bool _isLoading = true;
@@ -28,7 +29,11 @@ class _StaffScreenState extends State<StaffScreen> {
 
   Future<void> _init() async {
     final salons = await context.read<SalonProvider>().get(filter: {'pageSize': 100});
-    setState(() => _salons = salons.items);
+    final users = await context.read<UserProvider>().get(filter: {'pageSize': 100});
+    setState(() {
+      _salons = salons.items;
+      _allUsers = users.items;
+    });
     await _load();
   }
 
@@ -46,9 +51,9 @@ class _StaffScreenState extends State<StaffScreen> {
   }
 
   Future<void> _openAddForm() async {
-    final userIdController = TextEditingController();
     final roleController = TextEditingController(text: 'Stylist');
     int? salonId = _salonId ?? _salons.firstOrNull?.id;
+    UserModel? selectedUser;
     List<SalonServiceModel> availableServices = [];
     final selectedServiceIds = <int>{};
 
@@ -84,10 +89,22 @@ class _StaffScreenState extends State<StaffScreen> {
                     }
                   },
                 ),
-                TextField(
-                  controller: userIdController,
-                  decoration: const InputDecoration(labelText: 'User ID (existing account)'),
-                  keyboardType: TextInputType.number,
+                Autocomplete<UserModel>(
+                  displayStringForOption: (u) => '${u.firstName} ${u.lastName} (${u.username})',
+                  optionsBuilder: (value) {
+                    if (value.text.isEmpty) return _allUsers;
+                    final query = value.text.toLowerCase();
+                    return _allUsers.where((u) =>
+                        '${u.firstName} ${u.lastName}'.toLowerCase().contains(query) ||
+                        u.username.toLowerCase().contains(query) ||
+                        u.email.toLowerCase().contains(query));
+                  },
+                  onSelected: (u) => setDialogState(() => selectedUser = u),
+                  fieldViewBuilder: (context, controller, focusNode, onSubmitted) => TextField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    decoration: const InputDecoration(labelText: 'Existing account (search by name, username or email)'),
+                  ),
                 ),
                 TextField(controller: roleController, decoration: const InputDecoration(labelText: 'Role / title')),
                 const SizedBox(height: 8),
@@ -107,17 +124,20 @@ class _StaffScreenState extends State<StaffScreen> {
           ),
           actions: [
             TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Save')),
+            FilledButton(
+              onPressed: selectedUser != null ? () => Navigator.of(context).pop(true) : null,
+              child: const Text('Save'),
+            ),
           ],
         ),
       ),
     );
 
-    if (result != true || salonId == null) return;
+    if (result != true || salonId == null || selectedUser == null) return;
 
     await context.read<StaffProvider>().insert({
       'salonId': salonId,
-      'userId': int.tryParse(userIdController.text) ?? 0,
+      'userId': selectedUser!.id,
       'role': roleController.text,
       'serviceIds': selectedServiceIds.toList(),
     });

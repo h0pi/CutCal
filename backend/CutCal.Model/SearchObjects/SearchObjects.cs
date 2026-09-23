@@ -74,6 +74,11 @@ public class SalonCategorySearchObject : BaseSearchObject
     public string? Name { get; set; }
 }
 
+public class CountrySearchObject : BaseSearchObject
+{
+    public string? Name { get; set; }
+}
+
 public class CitySearchObject : BaseSearchObject
 {
     public string? Name { get; set; }

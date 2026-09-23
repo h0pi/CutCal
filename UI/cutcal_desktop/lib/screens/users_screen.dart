@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../providers/entity_providers.dart';
+import '../utils/api_client_exception.dart';
 import '../utils/utils_widgets.dart';
 
 class UsersScreen extends StatefulWidget {
@@ -101,6 +102,47 @@ class _UsersScreenState extends State<UsersScreen> {
     _load();
   }
 
+  Future<void> _editRole(UserModel user) async {
+    String role = user.roles.isNotEmpty ? user.roles.first : 'Customer';
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Change role — ${user.firstName} ${user.lastName}'),
+          content: SizedBox(
+            width: 320,
+            child: DropdownButtonFormField<String>(
+              initialValue: role,
+              decoration: const InputDecoration(labelText: 'Role'),
+              items: const [
+                DropdownMenuItem(value: 'Customer', child: Text('Customer')),
+                DropdownMenuItem(value: 'Staff', child: Text('Staff')),
+                DropdownMenuItem(value: 'SalonManager', child: Text('Salon Manager')),
+                DropdownMenuItem(value: 'Admin', child: Text('Admin')),
+              ],
+              onChanged: (v) => setDialogState(() => role = v ?? role),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Save')),
+          ],
+        ),
+      ),
+    );
+
+    if (result != true) return;
+
+    try {
+      await context.read<UserProvider>().setRole(user.id, role);
+      if (mounted) showSuccessSnackBar(context, 'Role updated.');
+      _load();
+    } on ApiClientException catch (e) {
+      if (mounted) showErrorSnackBar(context, e.message);
+    }
+  }
+
   Future<void> _toggleActive(UserModel user) async {
     final confirmed = await showConfirmationDialog(
       context,
@@ -184,6 +226,7 @@ class _UsersScreenState extends State<UsersScreen> {
                         DataColumn(label: Text('Email')),
                         DataColumn(label: Text('Roles')),
                         DataColumn(label: Text('Active')),
+                        DataColumn(label: Text('')),
                       ],
                       rows: _users
                           .map((u) => DataRow(cells: [
@@ -192,6 +235,11 @@ class _UsersScreenState extends State<UsersScreen> {
                                 DataCell(Text(u.email)),
                                 DataCell(Text(u.roles.join(', '))),
                                 DataCell(Switch(value: u.isActive, onChanged: (_) => _toggleActive(u))),
+                                DataCell(IconButton(
+                                  icon: const Icon(Icons.edit, size: 18),
+                                  tooltip: 'Change role',
+                                  onPressed: () => _editRole(u),
+                                )),
                               ]))
                           .toList(),
                     ),

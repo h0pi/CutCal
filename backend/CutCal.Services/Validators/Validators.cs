@@ -88,6 +88,15 @@ public class UserInsertRequestValidator : AbstractValidator<UserInsertRequest>
     }
 }
 
+public class UserRoleUpdateRequestValidator : AbstractValidator<UserRoleUpdateRequest>
+{
+    public UserRoleUpdateRequestValidator()
+    {
+        RuleFor(x => x.Role).Must(role => role is RoleNames.Customer or RoleNames.Staff or RoleNames.SalonManager or RoleNames.Admin)
+            .WithMessage($"Role must be one of: {RoleNames.Customer}, {RoleNames.Staff}, {RoleNames.SalonManager}, {RoleNames.Admin}.");
+    }
+}
+
 public class UserUpdateRequestValidator : AbstractValidator<UserUpdateRequest>
 {
     public UserUpdateRequestValidator()
@@ -182,12 +191,22 @@ public class SalonCategoryUpdateRequestValidator : AbstractValidator<SalonCatego
     public SalonCategoryUpdateRequestValidator() => RuleFor(x => x.Name).RequiredName("Category name", Rules.TitleMaxLength);
 }
 
+public class CountryInsertRequestValidator : AbstractValidator<CountryInsertRequest>
+{
+    public CountryInsertRequestValidator() => RuleFor(x => x.Name).RequiredName("Country name", Rules.TitleMaxLength);
+}
+
+public class CountryUpdateRequestValidator : AbstractValidator<CountryUpdateRequest>
+{
+    public CountryUpdateRequestValidator() => RuleFor(x => x.Name).RequiredName("Country name", Rules.TitleMaxLength);
+}
+
 public class CityInsertRequestValidator : AbstractValidator<CityInsertRequest>
 {
     public CityInsertRequestValidator()
     {
         RuleFor(x => x.Name).RequiredName("City name", Rules.TitleMaxLength);
-        RuleFor(x => x.Country).RequiredName("Country", Rules.TitleMaxLength);
+        RuleFor(x => x.CountryId).GreaterThan(0).WithMessage("Choose a country.");
     }
 }
 
@@ -196,7 +215,7 @@ public class CityUpdateRequestValidator : AbstractValidator<CityUpdateRequest>
     public CityUpdateRequestValidator()
     {
         RuleFor(x => x.Name).RequiredName("City name", Rules.TitleMaxLength);
-        RuleFor(x => x.Country).RequiredName("Country", Rules.TitleMaxLength);
+        RuleFor(x => x.CountryId).GreaterThan(0).WithMessage("Choose a country.");
     }
 }
 

@@ -15,7 +15,7 @@ public interface IReviewService : IBaseReadService<ReviewResponse, ReviewSearchO
 {
     Task<ReviewResponse> InsertAsync(ReviewInsertRequest request, int customerId);
     Task<ReviewResponse> ReplyAsync(int id, ReviewReplyRequest request, int salonManagerId);
-    Task RemoveAsync(int id, int adminId);
+    Task RemoveAsync(int id, int removedById);
 }
 
 public class ReviewService : BaseReadService<Review, ReviewResponse, ReviewSearchObject>, IReviewService
@@ -114,11 +114,12 @@ public class ReviewService : BaseReadService<Review, ReviewResponse, ReviewSearc
         return review.Adapt<ReviewResponse>();
     }
 
-    public async Task RemoveAsync(int id, int adminId)
+    public async Task RemoveAsync(int id, int removedById)
     {
         var review = await Context.Reviews.FirstOrDefaultAsync(x => x.Id == id) ?? throw new ClientException("Review not found.");
+        await OwnershipGuard.EnsureManagesSalonAsync(Context, review.SalonId, _userAccessor);
         review.IsRemoved = true;
-        review.RemovedById = adminId;
+        review.RemovedById = removedById;
         await UpdateSalonRatingAsync(review.SalonId, newRating: null, excludedReviewId: review.Id);
         await Context.SaveChangesAsync();
     }

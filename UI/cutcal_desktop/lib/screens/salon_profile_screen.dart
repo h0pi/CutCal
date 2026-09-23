@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
@@ -60,28 +62,50 @@ class _SalonProfileScreenState extends State<SalonProfileScreen> {
     final salon = _selectedSalon;
     if (salon == null) return;
 
+    final mapController = MapController();
     final queryController = TextEditingController(text: '${_addressController.text.trim()}, ${salon.cityName ?? ''}'.replaceAll(RegExp(r',\s*$'), ''));
-    List<GeocodeResultModel> results = [];
-    GeocodeResultModel? chosen;
+    var marker = LatLng(_latitude ?? salon.latitude, _longitude ?? salon.longitude);
+    String? label = _locationLabel;
     String? errorText;
-    var isSearching = false;
+    var isBusy = false;
+
+    Future<void> reverseLookup(StateSetter setDialogState, LatLng point) async {
+      setDialogState(() {
+        isBusy = true;
+        errorText = null;
+      });
+      try {
+        final result = await context.read<GeocodingProvider>().reverse(point.latitude, point.longitude);
+        setDialogState(() => label = result.displayName);
+      } on ApiClientException catch (e) {
+        setDialogState(() => errorText = e.message);
+      } finally {
+        setDialogState(() => isBusy = false);
+      }
+    }
 
     Future<void> runSearch(StateSetter setDialogState) async {
       setDialogState(() {
-        isSearching = true;
+        isBusy = true;
         errorText = null;
       });
       try {
         final found = await context.read<GeocodingProvider>().search(queryController.text.trim());
-        setDialogState(() {
-          results = found;
-          chosen = found.firstOrNull;
-          if (found.isEmpty) errorText = 'No matches found. Try adding the city.';
-        });
+        if (found.isEmpty) {
+          setDialogState(() => errorText = 'No matches found. Try adding the city.');
+        } else {
+          final first = found.first;
+          final point = LatLng(first.latitude, first.longitude);
+          setDialogState(() {
+            marker = point;
+            label = first.displayName;
+          });
+          mapController.move(point, 16);
+        }
       } on ApiClientException catch (e) {
         setDialogState(() => errorText = e.message);
       } finally {
-        setDialogState(() => isSearching = false);
+        setDialogState(() => isBusy = false);
       }
     }
 
@@ -91,66 +115,84 @@ class _SalonProfileScreenState extends State<SalonProfileScreen> {
         builder: (context, setDialogState) => AlertDialog(
           title: Row(
             children: [
-              const Expanded(child: Text('Find salon location')),
+              const Expanded(child: Text('Pick salon location')),
               IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop(false)),
             ],
           ),
           content: SizedBox(
-            width: 480,
+            width: 560,
+            height: 520,
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 TextField(
                   controller: queryController,
                   decoration: InputDecoration(
-                    labelText: 'Street and city',
+                    labelText: 'Search an address',
                     hintText: 'Ferhadija 1, Sarajevo',
                     errorText: errorText,
-                    suffixIcon: isSearching
+                    suffixIcon: isBusy
                         ? const Padding(padding: EdgeInsets.all(12), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)))
                         : IconButton(icon: const Icon(Icons.search), onPressed: () => runSearch(setDialogState)),
                   ),
                   onSubmitted: (_) => runSearch(setDialogState),
                 ),
                 const SizedBox(height: 8),
-                if (results.isNotEmpty)
-                  Flexible(
-                    child: SingleChildScrollView(
-                      child: RadioGroup<GeocodeResultModel>(
-                        groupValue: chosen,
-                        onChanged: (v) => setDialogState(() => chosen = v),
-                        child: Column(
-                          children: results
-                              .map((r) => RadioListTile<GeocodeResultModel>(
-                                    value: r,
-                                    dense: true,
-                                    title: Text(r.displayName, maxLines: 2, overflow: TextOverflow.ellipsis),
-                                  ))
-                              .toList(),
-                        ),
+                const Text('Or tap anywhere on the map to drop the pin.', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: FlutterMap(
+                      mapController: mapController,
+                      options: MapOptions(
+                        initialCenter: marker,
+                        initialZoom: 15,
+                        onTap: (tapPosition, point) {
+                          setDialogState(() => marker = point);
+                          reverseLookup(setDialogState, point);
+                        },
                       ),
+                      children: [
+                        TileLayer(
+                          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          userAgentPackageName: 'com.cutcal.desktop',
+                        ),
+                        MarkerLayer(markers: [
+                          Marker(
+                            point: marker,
+                            width: 40,
+                            height: 40,
+                            child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
+                          ),
+                        ]),
+                      ],
                     ),
-                  )
-                else
-                  const Text('Type an address and press Enter to search.', style: TextStyle(color: Colors.grey)),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  label ?? '${marker.latitude.toStringAsFixed(5)}, ${marker.longitude.toStringAsFixed(5)}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12),
+                ),
               ],
             ),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-            FilledButton(onPressed: chosen == null ? null : () => Navigator.of(context).pop(true), child: const Text('Use this location')),
+            FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Use this location')),
           ],
         ),
       ),
     );
 
-    final picked = chosen;
-    if (confirmed != true || picked == null || !mounted) return;
+    if (confirmed != true || !mounted) return;
     setState(() {
-      _latitude = picked.latitude;
-      _longitude = picked.longitude;
-      _locationLabel = picked.displayName;
+      _latitude = marker.latitude;
+      _longitude = marker.longitude;
+      _locationLabel = label;
     });
   }
 
@@ -285,7 +327,7 @@ class _SalonProfileScreenState extends State<SalonProfileScreen> {
                 child: TextField(controller: _addressController, decoration: const InputDecoration(labelText: 'Address', border: OutlineInputBorder())),
               ),
               const SizedBox(width: 8),
-              OutlinedButton.icon(icon: const Icon(Icons.place_outlined), label: const Text('Find on map'), onPressed: _pickCoordinates),
+              OutlinedButton.icon(icon: const Icon(Icons.place_outlined), label: const Text('Pick on map'), onPressed: _pickCoordinates),
             ],
           ),
           if (_locationLabel != null)

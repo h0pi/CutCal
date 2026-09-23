@@ -46,6 +46,13 @@ public class UsersController : BaseCRUDController<UserResponse, UserSearchObject
     [Authorize(Roles = RoleNames.Admin)]
     public override Task<IActionResult> Delete(int id) => base.Delete(id);
 
+    [HttpPut("{id:int}/Role")]
+    [Authorize(Roles = RoleNames.Admin)]
+    public async Task<ActionResult<UserResponse>> SetRole(int id, [FromBody] UserRoleUpdateRequest request)
+    {
+        return Ok(await Service.SetRoleAsync(id, request.Role));
+    }
+
     [HttpPut("{id:int}/ChangePassword")]
     public async Task<IActionResult> ChangePassword(int id, [FromBody] ChangePasswordRequest request)
     {
