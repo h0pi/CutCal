@@ -21,6 +21,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _autoConfirm = false;
   String _currency = 'USD';
   bool _is24HourFormat = true;
+  String _timeZone = 'UTC';
 
   @override
   void initState() {
@@ -41,6 +42,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _selectedSalon = salon;
       _autoConfirm = salon.autoConfirm;
+      _currency = salon.currency;
+      _is24HourFormat = salon.is24HourFormat;
+      _timeZone = salon.timeZone;
       _hours = List.generate(7, (i) {
         final existing = salon.workingHours.where((wh) => wh.dayOfWeek == i).toList();
         return existing.isNotEmpty ? existing.first : SalonWorkingHoursModel(dayOfWeek: i, openTime: '09:00', closeTime: '20:00');
@@ -78,6 +82,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       'email': salon.email,
       'profileImageUrl': salon.profileImageUrl,
       'autoConfirm': _autoConfirm,
+      'currency': _currency,
+      'is24HourFormat': _is24HourFormat,
+      'timeZone': _timeZone,
       'workingHours': _hours.map((h) => h.toJson()).toList(),
     });
     if (mounted) showSuccessSnackBar(context, 'Settings saved.');
@@ -142,6 +149,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
               DropdownMenuItem(value: 'BAM', child: Text('BAM')),
             ],
             onChanged: (v) => setState(() => _currency = v ?? 'USD'),
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            initialValue: _timeZone,
+            decoration: const InputDecoration(labelText: 'Time zone'),
+            items: const [
+              DropdownMenuItem(value: 'UTC', child: Text('UTC')),
+              DropdownMenuItem(value: 'Europe/Sarajevo', child: Text('Europe/Sarajevo')),
+              DropdownMenuItem(value: 'Europe/Zagreb', child: Text('Europe/Zagreb')),
+              DropdownMenuItem(value: 'Europe/Belgrade', child: Text('Europe/Belgrade')),
+              DropdownMenuItem(value: 'Europe/London', child: Text('Europe/London')),
+            ],
+            onChanged: (v) => setState(() => _timeZone = v ?? 'UTC'),
           ),
           SwitchListTile(
             value: _is24HourFormat,

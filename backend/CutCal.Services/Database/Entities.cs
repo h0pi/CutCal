@@ -89,6 +89,9 @@ public class Salon
     public bool IsApproved { get; set; }
     public bool AutoConfirm { get; set; }
     public bool IsFeatured { get; set; }
+    public string Currency { get; set; } = "USD";
+    public bool Is24HourFormat { get; set; } = true;
+    public string TimeZone { get; set; } = "UTC";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public List<SalonWorkingHours> WorkingHours { get; set; } = new();

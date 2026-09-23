@@ -52,6 +52,28 @@ class _ReportsScreenState extends State<ReportsScreen> {
     _load();
   }
 
+  void _applyPreset(String preset) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    setState(() {
+      switch (preset) {
+        case 'Today':
+          _dateFrom = today;
+          _dateTo = today.add(const Duration(days: 1)).subtract(const Duration(milliseconds: 1));
+          break;
+        case 'Week':
+          _dateFrom = today.subtract(Duration(days: today.weekday - 1));
+          _dateTo = now;
+          break;
+        case 'Month':
+          _dateFrom = DateTime(now.year, now.month, 1);
+          _dateTo = now;
+          break;
+      }
+    });
+    _load();
+  }
+
   Future<void> _downloadAppointmentsPdf() async {
     final bytes = await context.read<ReportProvider>().downloadAppointmentsPdf(salonId: _salonId, dateFrom: _dateFrom, dateTo: _dateTo);
     await _saveAndNotify(bytes, 'appointments-report.pdf');
@@ -112,6 +134,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 label: Text(_dateTo == null ? 'To date' : DateFormat('MMM d').format(_dateTo!)),
                 onPressed: () => _pickDate(isFrom: false),
               ),
+              for (final preset in const ['Today', 'Week', 'Month'])
+                OutlinedButton(onPressed: () => _applyPreset(preset), child: Text(preset)),
             ],
           ),
           const SizedBox(height: 24),
@@ -128,8 +152,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     Text('Summary', style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 8),
                     Text('Total appointments: ${appointmentsReport?['totalAppointments'] ?? '-'}'),
-                    Text('Confirmed: ${appointmentsReport?['confirmedCount'] ?? '-'}  •  Cancelled: ${appointmentsReport?['cancelledCount'] ?? '-'}'),
+                    Text(
+                      'Confirmed: ${appointmentsReport?['confirmedCount'] ?? '-'}  •  '
+                      'Completed: ${appointmentsReport?['completedCount'] ?? '-'}  •  '
+                      'Cancelled: ${appointmentsReport?['cancelledCount'] ?? '-'}',
+                    ),
                     Text('Total revenue: \$${appointmentsReport?['totalRevenue'] ?? 0}'),
+                    Text('Average duration: ${(appointmentsReport?['averageDurationMinutes'] as num?)?.toStringAsFixed(0) ?? '-'} min'),
+                    Text('Busiest day: ${appointmentsReport?['busiestDayOfWeek'] ?? '-'}'),
                     Text('Most popular service: ${servicesReport?['mostPopularService'] ?? '-'}'),
                   ],
                 ),

@@ -79,6 +79,11 @@ public class ReportService : IReportService
 
         var appointments = await query.OrderBy(x => x.ScheduledAt).ToListAsync();
 
+        var busiestDay = appointments
+            .GroupBy(x => x.ScheduledAt.DayOfWeek)
+            .OrderByDescending(g => g.Count())
+            .FirstOrDefault()?.Key;
+
         return new AppointmentsReportResponse
         {
             TotalAppointments = appointments.Count,
@@ -86,6 +91,8 @@ public class ReportService : IReportService
             CancelledCount = appointments.Count(x => x.StateName == AppointmentStateNames.Cancelled),
             CompletedCount = appointments.Count(x => x.StateName == AppointmentStateNames.Completed),
             TotalRevenue = appointments.Where(x => x.PaymentStatus == PaymentStatusNames.Paid).Sum(x => x.Price),
+            AverageDurationMinutes = appointments.Count > 0 ? appointments.Average(x => x.DurationMinutes) : 0,
+            BusiestDayOfWeek = busiestDay?.ToString(),
             Appointments = appointments.Select(a => new AppointmentResponse
             {
                 Id = a.Id,
@@ -156,6 +163,7 @@ public class ReportService : IReportService
                 page.Content().Column(column =>
                 {
                     column.Item().Text($"Total: {report.TotalAppointments}  Confirmed: {report.ConfirmedCount}  Cancelled: {report.CancelledCount}  Completed: {report.CompletedCount}  Revenue: {report.TotalRevenue:C}");
+                    column.Item().Text($"Avg. duration: {report.AverageDurationMinutes:F0} min  Busiest day: {report.BusiestDayOfWeek ?? "N/A"}");
                     column.Item().PaddingTop(10).Table(table =>
                     {
                         table.ColumnsDefinition(columns =>

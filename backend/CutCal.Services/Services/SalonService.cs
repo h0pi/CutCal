@@ -227,6 +227,9 @@ public class SalonManagementService : BaseCRUDService<Salon, SalonResponse, Salo
         entity.Email = request.Email;
         entity.ProfileImageUrl = request.ProfileImageUrl;
         entity.AutoConfirm = request.AutoConfirm;
+        entity.Currency = request.Currency;
+        entity.Is24HourFormat = request.Is24HourFormat;
+        entity.TimeZone = request.TimeZone;
 
         if (request.WorkingHours.Count > 0)
         {

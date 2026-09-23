@@ -133,6 +133,9 @@ class SalonModel {
   final bool isApproved;
   final bool autoConfirm;
   final bool isFeatured;
+  final String currency;
+  final bool is24HourFormat;
+  final String timeZone;
   final double? distanceKm;
   final List<SalonWorkingHoursModel> workingHours;
 
@@ -154,6 +157,9 @@ class SalonModel {
     this.isApproved = false,
     this.autoConfirm = false,
     this.isFeatured = false,
+    this.currency = 'USD',
+    this.is24HourFormat = true,
+    this.timeZone = 'UTC',
     this.distanceKm,
     this.workingHours = const [],
   });
@@ -176,6 +182,9 @@ class SalonModel {
         isApproved: json['isApproved'] ?? false,
         autoConfirm: json['autoConfirm'] ?? false,
         isFeatured: json['isFeatured'] ?? false,
+        currency: json['currency'] ?? 'USD',
+        is24HourFormat: json['is24HourFormat'] ?? true,
+        timeZone: json['timeZone'] ?? 'UTC',
         distanceKm: json['distanceKm'] == null ? null : (json['distanceKm']).toDouble(),
         workingHours: (json['workingHours'] as List? ?? [])
             .map((e) => SalonWorkingHoursModel.fromJson(e))

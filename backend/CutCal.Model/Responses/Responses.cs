@@ -61,6 +61,9 @@ public class SalonResponse
     public bool IsApproved { get; set; }
     public bool AutoConfirm { get; set; }
     public bool IsFeatured { get; set; }
+    public string Currency { get; set; } = "USD";
+    public bool Is24HourFormat { get; set; } = true;
+    public string TimeZone { get; set; } = "UTC";
     public DateTime CreatedAt { get; set; }
     public List<SalonWorkingHoursResponse> WorkingHours { get; set; } = new();
     public double? DistanceKm { get; set; }
@@ -196,6 +199,8 @@ public class AppointmentsReportResponse
     public int CancelledCount { get; set; }
     public int CompletedCount { get; set; }
     public decimal TotalRevenue { get; set; }
+    public double AverageDurationMinutes { get; set; }
+    public string? BusiestDayOfWeek { get; set; }
     public List<AppointmentResponse> Appointments { get; set; } = new();
 }
 

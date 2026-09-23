@@ -157,6 +157,8 @@ public class SalonUpdateRequestValidator : AbstractValidator<SalonUpdateRequest>
         RuleFor(x => x.Phone).ValidPhone();
         RuleFor(x => x.Email).ValidOptionalEmail();
         RuleFor(x => x.ProfileImageUrl).MaximumLength(Rules.UrlMaxLength);
+        RuleFor(x => x.Currency).Must(c => c is "USD" or "EUR" or "BAM").WithMessage("Currency must be one of: USD, EUR, BAM.");
+        RuleFor(x => x.TimeZone).NotEmpty().WithMessage("Time zone is required.");
         RuleForEach(x => x.WorkingHours).SetValidator(new SalonWorkingHoursUpsertRequestValidator());
     }
 }
