@@ -31,6 +31,7 @@ class _SalonListScreenState extends State<SalonListScreen> {
   int? _selectedCategoryId;
   List<SalonModel> _salons = [];
   List<RecommendationModel> _recommendations = [];
+  List<SalonModel> _featuredSalons = [];
   SalonFilters _filters = const SalonFilters();
   int _totalCount = 0;
   int _page = 0;
@@ -50,6 +51,7 @@ class _SalonListScreenState extends State<SalonListScreen> {
     _determineLocation();
     _loadSalons(reset: true);
     _loadRecommendations();
+    _loadFeatured();
   }
 
   Future<void> _determineLocation() async {
@@ -69,6 +71,7 @@ class _SalonListScreenState extends State<SalonListScreen> {
       });
       _loadSalons(reset: true);
       _loadRecommendations();
+      _loadFeatured();
     } catch (_) {
       // Distance just won't be shown; the rest of the screen still works.
     }
@@ -83,8 +86,25 @@ class _SalonListScreenState extends State<SalonListScreen> {
     }
   }
 
+  Future<void> _loadFeatured() async {
+    try {
+      final result = await context.read<SalonProvider>().get(filter: {
+        'isFeaturedOnly': true,
+        'pageSize': _maxRecommendations,
+        'lat': _lat,
+        'lng': _lng,
+      });
+      if (mounted) setState(() => _featuredSalons = result.items);
+    } on ApiClientException catch (e) {
+      debugPrint('Could not load featured salons: ${e.message}');
+    }
+  }
+
   bool get _showRecommendations =>
       _recommendations.isNotEmpty && _selectedCategoryId == null && _searchController.text.isEmpty && !_filters.isActive;
+
+  bool get _showFeatured =>
+      _featuredSalons.isNotEmpty && _selectedCategoryId == null && _searchController.text.isEmpty && !_filters.isActive;
 
   String get _listTitle {
     if (_selectedCategoryId != null || _searchController.text.isNotEmpty) return 'Results';
@@ -206,6 +226,7 @@ class _SalonListScreenState extends State<SalonListScreen> {
               ),
             ),
           ),
+          if (_showFeatured) SliverToBoxAdapter(child: _buildFeatured()),
           if (_showRecommendations) SliverToBoxAdapter(child: _buildRecommendations()),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -336,6 +357,35 @@ class _SalonListScreenState extends State<SalonListScreen> {
     );
   }
 
+  Widget _buildFeatured() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 8, 16, 10),
+          child: Row(
+            children: [
+              Icon(Icons.bolt, size: 18, color: AppColors.starColor),
+              SizedBox(width: 6),
+              Text('Featured salons', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 190,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: _featuredSalons.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, i) => _FeaturedSalonCard(salon: _featuredSalons[i]),
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
   Widget _buildRecommendations() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -460,6 +510,71 @@ class _RecommendationCard extends StatelessWidget {
   }
 }
 
+class _FeaturedSalonCard extends StatelessWidget {
+  final SalonModel salon;
+
+  const _FeaturedSalonCard({required this.salon});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 220,
+      child: Card(
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => SalonDetailScreen(salonId: salon.id, initialDistanceKm: salon.distanceKm)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
+                children: [
+                  SizedBox(
+                    height: 100,
+                    width: double.infinity,
+                    child: (kShowSalonImages && salon.profileImageUrl != null)
+                        ? Image.network(
+                            resolveImageUrl(salon.profileImageUrl!),
+                            fit: BoxFit.cover,
+                            cacheWidth: 400,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              color: AppColors.primaryLight,
+                              alignment: Alignment.center,
+                              child: const Icon(Icons.storefront, size: 32, color: AppColors.primary),
+                            ),
+                          )
+                        : Container(color: AppColors.primaryLight, child: const Icon(Icons.storefront, size: 32, color: AppColors.primary)),
+                  ),
+                  const Positioned(top: 8, left: 8, child: FeaturedBadge()),
+                  Positioned(top: 8, right: 8, child: RatingBadge(rating: salon.avgRating)),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        salon.name,
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (salon.minServicePrice != null)
+                      Text('from \$${salon.minServicePrice!.toStringAsFixed(0)}', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _SalonCard extends StatelessWidget {
   final SalonModel salon;
 
@@ -551,6 +666,7 @@ class _SalonCard extends StatelessWidget {
                         )
                       : Container(color: AppColors.primaryLight, child: const Icon(Icons.storefront, size: 40, color: AppColors.primary)),
                 ),
+                if (salon.isFeatured) const Positioned(top: 10, left: 10, child: FeaturedBadge()),
                 Positioned(top: 10, right: 10, child: RatingBadge(rating: salon.avgRating)),
               ],
             ),

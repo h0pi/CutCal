@@ -30,6 +30,7 @@ public class SalonSearchObject : BaseSearchObject
     /// <summary>The client's current local time; salons store wall-clock opening hours.</summary>
     public DateTime? NowLocal { get; set; }
     public bool? IsApproved { get; set; }
+    public bool? IsFeaturedOnly { get; set; }
 }
 
 public class SalonServiceSearchObject : BaseSearchObject

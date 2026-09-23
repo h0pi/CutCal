@@ -97,6 +97,10 @@ public class SalonManagementService : BaseCRUDService<Salon, SalonResponse, Salo
         {
             query = query.Where(x => x.AvgRating >= search.MinRating.Value);
         }
+        if (search.IsFeaturedOnly == true)
+        {
+            query = query.Where(x => x.IsFeatured);
+        }
         if (search.OpenNow == true)
         {
             var now = search.NowLocal ?? DateTime.UtcNow;
