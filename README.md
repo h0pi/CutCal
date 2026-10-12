@@ -8,12 +8,15 @@ Appointment booking platform for hair and beauty salons.
 - `backend/CutCal.Services` - database entities, `CutCalDbContext`, migrations and seed, business services, state machine, FluentValidation validators
 - `backend/CutCal.Common.Services` - `CryptoService` (BCrypt password hashing)
 - `backend/CutCal.Messaging` - RabbitMQ topology, message contract and retry policy shared by the API and the worker
+- `backend/CutCal.Recommender` - salon recommender model (matrix factorization, ML.NET): training, saving, loading and scoring
 - `backend/CutCal.WebAPI` - controllers, filters (exceptions, validation), JWT auth, Swagger, static images
-- `backend/CutCal.Worker` - separate microservice (own container): consumes RabbitMQ and sends the e-mails
+- `backend/CutCal.Worker` - separate microservice (own container): consumes RabbitMQ and sends the e-mails, and trains the recommender model
+- `backend/CutCal.Tests` - xUnit tests (`dotnet test` in `backend`)
 - `UI/cutcal_mobile` - Flutter mobile app (Android): customers, plus Business Mode for salon managers
 - `UI/cutcal_desktop` - Flutter desktop app (Windows): administration and reports
 
 Two services share one SQL Server database (`220240`) and talk through RabbitMQ: the API publishes a message after every appointment or payment event, the worker turns it into an e-mail.
+The worker also trains the salon recommender: when it starts, and then every hour, it reads bookings, favourites and salon views from the database and writes the model file (`Recommender__ModelPath`, a shared Docker volume under Docker). The API reads that file (again whenever it changes, no restart) to rank the salons of `GET /Recommendations`; until a model exists, and for a customer the model has not seen yet, the list falls back to popularity, rating and distance. An admin can ask for a fresh model right away with `POST /Recommendations/Retrain`: the API puts a request on the RabbitMQ queue `cutcal.recommender.retrain` and answers 202, and the worker retrains in the background. After every training the worker logs an offline evaluation of the model (leave-one-out HitRate@3 against a popularity baseline).
 If the worker fails to send a message it retries with exponential backoff (1 s, 2 s, 4 s, 8 s) and then moves it to the dead-letter queue `cutcal.notifications.email.dead`, where it can be inspected in the RabbitMQ management UI.
 
 ## Running the backend
@@ -86,6 +89,6 @@ Logging out invalidates the access token on the server (it is blacklisted until 
 
 - Notifications are refreshed by polling (`GET /Notifications`), not SignalR.
 - Server-side validation: every request object has a FluentValidation validator that runs before the action; errors state the expected format (for example the phone number pattern) and are shown to the user.
-- Recommender: see `recommender-dokumentacija.md`.
-- Demo data: 15 salons (3 per category, across Sarajevo, Mostar, Banja Luka, Zagreb and Belgrade) with photos, 30 staff members (`staff1`..`staff30`), 11 customers (`customer`, `customer2`..`customer10`, plus `mobile`), about 140 historic appointments with 90 reviews (salon ratings are the real average of their reviews), and every salon is topped up to three upcoming appointments each time the API starts. All seeded accounts use the password `test`.
+- Recommender: hybrid and explainable; the personal part is a matrix factorization model trained by the worker. Algorithm, data, training, evaluation and source are described in `recommender-dokumentacija.md`.
+- Demo data: 15 salons (3 per category, across Sarajevo, Mostar, Banja Luka, Zagreb and Belgrade) with photos, 30 staff members (`staff1`..`staff30`), 56 customers (`customer`, `customer2`..`customer55`, plus `mobile`), about 320 historic appointments with 90 reviews (salon ratings are the real average of their reviews), 90 favourites and 315 salon views (the customers `customer11`..`customer55` have distinct tastes so the recommender has something to learn from), and every salon is topped up to three upcoming appointments each time the API starts. All seeded accounts use the password `test`.
 - Salon and staff images are served by the API from `wwwroot/images` (credits in `wwwroot/images/CREDITS.md`).
