@@ -1,3 +1,6 @@
+# The API and the worker read the same database, so the connection string is written once.
+x-database-connection: &database-connection "Server=db,1433;Database=220240;User Id=sa;Password=${DB_SA_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=true"
+
 services:
   db:
     image: mcr.microsoft.com/mssql/server:2022-CU24-ubuntu-22.04
@@ -45,8 +48,10 @@ services:
     environment:
       ASPNETCORE_URLS: "http://+:5194"
       # Container addresses; everything else (secrets, JWT, SMTP, PayPal) comes from .env.
-      ConnectionStrings__DefaultConnection: "Server=db,1433;Database=220240;User Id=sa;Password=${DB_SA_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=true"
+      ConnectionStrings__DefaultConnection: *database-connection
       RabbitMQ__Host: rabbitmq
+    volumes:
+      - recommender_model:/app/recommender-model:ro
     restart: on-failure
 
   worker:
@@ -55,12 +60,18 @@ services:
       dockerfile: CutCal.Worker/Dockerfile
     container_name: cutcal-worker
     depends_on:
+      db:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
     env_file: .env
     environment:
+      ConnectionStrings__DefaultConnection: *database-connection
       RabbitMQ__Host: rabbitmq
+    volumes:
+      - recommender_model:/app/recommender-model
     restart: on-failure
 
 volumes:
   sqlserver_data:
+  recommender_model:

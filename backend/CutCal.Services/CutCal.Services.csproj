@@ -4,6 +4,7 @@
     <ProjectReference Include="..\CutCal.Model\CutCal.Model.csproj" />
     <ProjectReference Include="..\CutCal.Common.Services\CutCal.Common.Services.csproj" />
     <ProjectReference Include="..\CutCal.Messaging\CutCal.Messaging.csproj" />
+    <ProjectReference Include="..\CutCal.Recommender\CutCal.Recommender.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,40 +1,38 @@
 using CutCal.Model.Constants;
 using CutCal.Model.Responses;
 using CutCal.Services.Database;
+using CutCal.Services.Messaging;
+using CutCal.Services.Recommendation;
 using Mapster;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace CutCal.Services.Services;
 
 public interface IRecommendationService
 {
     Task<List<RecommendationResponse>> GetRecommendationsAsync(int customerId, double? lat, double? lng);
+
+    /// <summary>Asks the worker to train a fresh model; returns as soon as the request is queued.</summary>
+    Task RequestRetrainAsync();
 }
 
 /// <summary>
-/// Hybrid, explainable salon recommender (see recommender-dokumentacija.md).
+/// Hybrid, explainable salon recommender (see recommender-dokumentacija.md). The personal part is learned: a matrix
+/// factorization model that the worker trains on bookings, favourites and salon views.
 /// Final score = weighted mean of the components that are available for this user:
-///   history similarity (content-based) + proximity + quality (avg rating) + popularity.
+///   learned preference (model, mixed with interest in the searched categories) + proximity + quality (avg rating) + popularity.
+/// The content of the salons (category, city, price) explains a recommendation.
 /// </summary>
 public class RecommendationService : IRecommendationService
 {
     private const int MaxResults = 10;
     private const double MaxDistanceKm = 20;
 
-    private const double WeightHistory = 0.40;
+    private const double WeightLearned = 0.40;
     private const double WeightProximity = 0.20;
     private const double WeightQuality = 0.25;
     private const double WeightPopularity = 0.15;
-
-    private const double BookingStrength = 3;
-    private const double MaxBookingStrength = 6;
-    private const double FavoriteStrength = 2;
-    private const double ViewStrength = 0.5;
-    private const double MaxViewStrength = 2;
-    private const double PositiveReviewBonus = 1;
-    private const double NegativeReviewPenalty = -2;
-    private const int PositiveRatingMin = 4;
-    private const int NegativeRatingMax = 2;
 
     private const double SimilarityCategory = 0.6;
     private const double SimilarityCity = 0.2;
@@ -42,44 +40,55 @@ public class RecommendationService : IRecommendationService
     private const double SimilarityNeutralPrice = 0.5;
     private const double SimilarityMentionMin = 0.5;
 
-    private const double SearchShareInHistory = 0.25;
+    private const double SearchShareInLearned = 0.25;
     private const int SearchCountCap = 3;
 
+    private const double LearnedMention = 0.3;
     private const double ProximityMention = 0.5;
     private const double ExcellentRating = 4.5;
     private const double GoodRating = 4.0;
     private const int PopularMinBookings = 3;
     private const double PopularMinShare = 0.5;
 
-    private readonly CutCalDbContext _context;
+    // The approved salons and the booking counts are the same for every customer, so they are loaded once a minute
+    // instead of on every request; a new salon, rating or booking shows up in the recommendations within that minute.
+    private const string ApprovedSalonsCacheKey = "recommendations:approved-salons";
+    private const string BookingCountsCacheKey = "recommendations:booking-counts";
+    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(1);
 
-    public RecommendationService(CutCalDbContext context)
+    private readonly CutCalDbContext _context;
+    private readonly IRabbitMqPublisher _publisher;
+    private readonly IRecommenderModelProvider _modelProvider;
+    private readonly IMemoryCache _cache;
+
+    public RecommendationService(CutCalDbContext context, IRabbitMqPublisher publisher, IRecommenderModelProvider modelProvider, IMemoryCache cache)
     {
         _context = context;
+        _publisher = publisher;
+        _modelProvider = modelProvider;
+        _cache = cache;
     }
+
+    public Task RequestRetrainAsync() => _publisher.RequestRecommenderRetrainAsync();
 
     private sealed record Candidate(Salon Salon, decimal? AvgPrice, double? DistanceKm);
 
-    private sealed record Seed(Candidate Candidate, double Strength, int Bookings, bool IsFavorite);
+    private sealed record Seed(Candidate Candidate, int Bookings, bool IsFavorite);
 
     public async Task<List<RecommendationResponse>> GetRecommendationsAsync(int customerId, double? lat, double? lng)
     {
-        var salons = await _context.Salons.AsNoTracking()
+        var salons = await CachedAsync(ApprovedSalonsCacheKey, () => _context.Salons.AsNoTracking()
             .Include(x => x.SalonCategory)
             .Include(x => x.City)
             .Include(x => x.WorkingHours)
             .Include(x => x.Services)
             .Where(x => x.IsApproved)
-            .ToListAsync();
+            .ToListAsync());
 
         var myBookings = await CountBySalonAsync(_context.Appointments.Where(x => x.CustomerId == customerId && x.StateName != AppointmentStateNames.Cancelled).Select(x => x.SalonId));
-        var allBookings = await CountBySalonAsync(_context.Appointments.Where(x => x.StateName != AppointmentStateNames.Cancelled).Select(x => x.SalonId));
+        var allBookings = await CachedAsync(BookingCountsCacheKey, () => CountBySalonAsync(_context.Appointments.Where(x => x.StateName != AppointmentStateNames.Cancelled).Select(x => x.SalonId)));
         var myViews = await CountBySalonAsync(_context.SalonViews.Where(x => x.UserId == customerId).Select(x => x.SalonId));
         var favorites = (await _context.Favorites.Where(x => x.UserId == customerId).Select(x => x.SalonId).ToListAsync()).ToHashSet();
-        var myRatings = await _context.Reviews.Where(x => x.CustomerId == customerId && !x.IsRemoved)
-            .GroupBy(x => x.SalonId)
-            .Select(g => new { SalonId = g.Key, Rating = g.Average(r => r.Rating) })
-            .ToDictionaryAsync(x => x.SalonId, x => x.Rating);
         var categorySearches = await _context.UserSearchHistories.Where(x => x.UserId == customerId)
             .GroupBy(x => x.SalonCategoryId)
             .Select(g => new { CategoryId = g.Key, Count = g.Count() })
@@ -90,13 +99,12 @@ public class RecommendationService : IRecommendationService
             s.Services.Where(x => x.IsActive).Select(x => (decimal?)x.Price).Average(),
             lat.HasValue && lng.HasValue ? SalonManagementService.DistanceKm(lat.Value, lng.Value, s.Latitude, s.Longitude) : null)).ToList();
 
+        // Empty while there is no model yet or the model has never seen this customer (cold start).
+        var modelScores = _modelProvider.Current?.Score(customerId, candidates.Select(x => x.Salon.Id)) ?? new Dictionary<int, float>();
+
         var seeds = candidates
-            .Select(c => new Seed(
-                c,
-                InteractionStrength(c.Salon.Id, myBookings, myViews, favorites, myRatings),
-                myBookings.GetValueOrDefault(c.Salon.Id),
-                favorites.Contains(c.Salon.Id)))
-            .Where(x => x.Strength > 0)
+            .Where(c => myBookings.ContainsKey(c.Salon.Id) || myViews.ContainsKey(c.Salon.Id) || favorites.Contains(c.Salon.Id))
+            .Select(c => new Seed(c, myBookings.GetValueOrDefault(c.Salon.Id), favorites.Contains(c.Salon.Id)))
             .ToList();
 
         var maxBookings = Math.Max(allBookings.Values.DefaultIfEmpty(0).Max(), 1);
@@ -106,19 +114,17 @@ public class RecommendationService : IRecommendationService
         {
             var bestSeed = seeds
                 .Where(s => s.Candidate.Salon.Id != c.Salon.Id)
-                .OrderByDescending(s => s.Strength * Similarity(c, s.Candidate))
-                .FirstOrDefault();
+                .MaxBy(s => Similarity(c, s.Candidate));
 
-            double? history = seeds.Count > 0
-                ? seeds.Sum(s => s.Strength * Similarity(c, s.Candidate)) / seeds.Sum(s => s.Strength)
-                : null;
+            float? modelScore = modelScores.TryGetValue(c.Salon.Id, out var scored) ? scored : null;
+            double? learned = modelScore.HasValue ? Math.Clamp(modelScore.Value, 0, 1) : null;
 
             var searchCount = categorySearches.GetValueOrDefault(c.Salon.SalonCategoryId);
             double? searchInterest = maxSearches > 0 ? (double)Math.Min(searchCount, SearchCountCap) / SearchCountCap : null;
             if (searchInterest.HasValue)
             {
-                history = history.HasValue
-                    ? (1 - SearchShareInHistory) * history.Value + SearchShareInHistory * searchInterest.Value
+                learned = learned.HasValue
+                    ? (1 - SearchShareInLearned) * learned.Value + SearchShareInLearned * searchInterest.Value
                     : searchInterest;
             }
 
@@ -132,7 +138,7 @@ public class RecommendationService : IRecommendationService
                 (WeightQuality, quality),
                 (WeightPopularity, popularity)
             };
-            if (history.HasValue) components.Add((WeightHistory, history.Value));
+            if (learned.HasValue) components.Add((WeightLearned, learned.Value));
             if (proximity.HasValue) components.Add((WeightProximity, proximity.Value));
             var score = components.Sum(x => x.Weight * x.Value) / components.Sum(x => x.Weight);
 
@@ -143,32 +149,25 @@ public class RecommendationService : IRecommendationService
             {
                 Salon = response,
                 Score = Math.Round(score, 4),
-                Reason = BuildReason(c, bestSeed, searchCount, proximity, myBookings.GetValueOrDefault(c.Salon.Id), myViews.GetValueOrDefault(c.Salon.Id), favorites.Contains(c.Salon.Id), bookingCount, popularity)
+                Reason = BuildReason(c, bestSeed, modelScore, searchCount, proximity, myBookings.GetValueOrDefault(c.Salon.Id), myViews.GetValueOrDefault(c.Salon.Id), favorites.Contains(c.Salon.Id), bookingCount, popularity)
             };
         });
 
         return results.OrderByDescending(x => x.Score).Take(MaxResults).ToList();
     }
 
+    private async Task<T> CachedAsync<T>(string key, Func<Task<T>> load) =>
+        (await _cache.GetOrCreateAsync(key, entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = CacheDuration;
+            return load();
+        }))!;
+
     private static async Task<Dictionary<int, int>> CountBySalonAsync(IQueryable<int> salonIds)
     {
         return await salonIds.GroupBy(x => x)
             .Select(g => new { SalonId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.SalonId, x => x.Count);
-    }
-
-    private static double InteractionStrength(int salonId, Dictionary<int, int> bookings, Dictionary<int, int> views, HashSet<int> favorites, Dictionary<int, double> ratings)
-    {
-        var strength = Math.Min(bookings.GetValueOrDefault(salonId) * BookingStrength, MaxBookingStrength)
-            + (favorites.Contains(salonId) ? FavoriteStrength : 0)
-            + Math.Min(views.GetValueOrDefault(salonId) * ViewStrength, MaxViewStrength);
-
-        if (ratings.TryGetValue(salonId, out var rating))
-        {
-            if (rating >= PositiveRatingMin) strength += PositiveReviewBonus;
-            else if (rating <= NegativeRatingMax) strength += NegativeReviewPenalty;
-        }
-        return strength;
     }
 
     private static double Similarity(Candidate a, Candidate b)
@@ -184,7 +183,7 @@ public class RecommendationService : IRecommendationService
         return 1 - Math.Min((double)(Math.Abs(a.Value - b.Value) / Math.Max(a.Value, b.Value)), 1);
     }
 
-    private static string BuildReason(Candidate c, Seed? bestSeed, int searchCount, double? proximity, int myBookings, int myViews, bool isFavorite, int totalBookings, double popularity)
+    private static string BuildReason(Candidate c, Seed? bestSeed, float? modelScore, int searchCount, double? proximity, int myBookings, int myViews, bool isFavorite, int totalBookings, double popularity)
     {
         var parts = new List<string>();
 
@@ -202,6 +201,9 @@ public class RecommendationService : IRecommendationService
         {
             parts.Add($"pretraživali ste kategoriju {c.Salon.SalonCategory.Name} ({searchCount}x)");
         }
+
+        // For a salon the customer has not used yet, the model's score means "customers with similar habits choose it".
+        if (modelScore >= LearnedMention && myBookings == 0 && myViews == 0 && !isFavorite) parts.Add("često ga biraju korisnici sličnih navika");
 
         if (myBookings > 0) parts.Add($"već ste ovdje rezervisali {myBookings}x");
         else if (myViews > 0) parts.Add($"pregledali ste ga {myViews}x");

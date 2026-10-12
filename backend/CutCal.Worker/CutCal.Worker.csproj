@@ -15,5 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CutCal.Messaging\CutCal.Messaging.csproj" />
+    <ProjectReference Include="..\CutCal.Recommender\CutCal.Recommender.csproj" />
+    <ProjectReference Include="..\CutCal.Services\CutCal.Services.csproj" />
   </ItemGroup>
 </Project>

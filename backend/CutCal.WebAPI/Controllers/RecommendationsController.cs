@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace CutCal.WebAPI.Controllers;
 
 [ApiController]
-[Authorize(Roles = RoleNames.Customer)]
+[Authorize]
 [Route("[controller]")]
 public class RecommendationsController : ControllerBase
 {
@@ -22,8 +22,18 @@ public class RecommendationsController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Roles = RoleNames.Customer)]
     public async Task<ActionResult<List<RecommendationResponse>>> Get([FromQuery] double? lat, [FromQuery] double? lng)
     {
         return Ok(await _service.GetRecommendationsAsync(_userAccessor.UserId, lat, lng));
+    }
+
+    /// <summary>Queues a retrain; the worker trains in the background and the new model is used once it is done.</summary>
+    [HttpPost("Retrain")]
+    [Authorize(Roles = RoleNames.Admin)]
+    public async Task<IActionResult> Retrain()
+    {
+        await _service.RequestRetrainAsync();
+        return Accepted();
     }
 }

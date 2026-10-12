@@ -1,9 +1,11 @@
 using System.Text;
 using CutCal.Common.Services;
+using CutCal.Recommender;
 using CutCal.Services.Auth;
 using CutCal.Services.Base;
 using CutCal.Services.Database;
 using CutCal.Services.Messaging;
+using CutCal.Services.Recommendation;
 using CutCal.Services.Services;
 using CutCal.WebAPI.Auth;
 using CutCal.WebAPI.Filters;
@@ -76,6 +78,8 @@ builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IFavoriteService, FavoriteService>();
 builder.Services.AddScoped<IGeocodingService, GeocodingService>();
 builder.Services.AddSingleton<IRabbitMqPublisher, RabbitMqPublisher>();
+builder.Services.AddSingleton(RecommenderSettings.FromEnvironment());
+builder.Services.AddSingleton<IRecommenderModelProvider, RecommenderModelProvider>();
 
 // Geocoding (OpenStreetMap Nominatim): address and user agent come from configuration (.env).
 builder.Services.AddMemoryCache();
@@ -164,7 +168,9 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<CutCalDbContext>();
     await db.Database.MigrateAsync();
-    await DemoDataSeeder.EnsureUpcomingAppointmentsAsync(db, scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(nameof(DemoDataSeeder)));
+    var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
+    await DemoDataSeeder.EnsureUpcomingAppointmentsAsync(db, loggerFactory.CreateLogger(nameof(DemoDataSeeder)));
+    await RecommenderDemoDataSeeder.EnsureAsync(db, loggerFactory.CreateLogger(nameof(RecommenderDemoDataSeeder)));
 }
 
 app.UseSwagger();

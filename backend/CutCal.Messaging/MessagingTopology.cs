@@ -9,6 +9,9 @@ public static class MessagingTopology
     public const string EmailQueueName = "cutcal.notifications.email";
     public const string DeadLetterQueueName = "cutcal.notifications.email.dead";
 
+    /// <summary>Requests to retrain the recommender; published straight to this queue (no exchange needed).</summary>
+    public const string RetrainQueueName = "cutcal.recommender.retrain";
+
     public const string RetryCountHeader = "x-retry-count";
     public const string ErrorHeader = "x-error";
 
@@ -18,6 +21,7 @@ public static class MessagingTopology
         await channel.ExchangeDeclareAsync(ExchangeName, ExchangeType.Direct, durable: true, cancellationToken: cancellationToken);
         await channel.QueueDeclareAsync(DeadLetterQueueName, durable: true, exclusive: false, autoDelete: false, cancellationToken: cancellationToken);
         await channel.QueueDeclareAsync(EmailQueueName, durable: true, exclusive: false, autoDelete: false, cancellationToken: cancellationToken);
+        await channel.QueueDeclareAsync(RetrainQueueName, durable: true, exclusive: false, autoDelete: false, cancellationToken: cancellationToken);
 
         foreach (var messageType in NotificationMessageTypes.All)
         {

@@ -9,7 +9,7 @@ public static class CutCalSeed
     // CryptoService.HashPassword call): BCrypt embeds a fresh random salt on every
     // call, so re-hashing here would produce a different string on every build and
     // EF would perpetually think the seed data changed (PendingModelChangesWarning).
-    private const string SeedPasswordHash = "$2a$12$ut/rfr3dCMbxCMFkrTvqx.ZrocbPowx8.j7Db82QinlgaSQsF1yBi";
+    internal const string SeedPasswordHash ="$2a$12$ut/rfr3dCMbxCMFkrTvqx.ZrocbPowx8.j7Db82QinlgaSQsF1yBi";
 
     public static void Seed(ModelBuilder modelBuilder)
     {

@@ -17,42 +17,20 @@ public class RabbitMqConsumerService : BackgroundService
 
     private readonly ILogger<RabbitMqConsumerService> _logger;
     private readonly IEmailService _emailService;
-    private readonly ConnectionFactory _factory;
 
     public RabbitMqConsumerService(ILogger<RabbitMqConsumerService> logger, IEmailService emailService)
     {
         _logger = logger;
         _emailService = emailService;
-
-        var settings = RabbitMqSettings.FromEnvironment();
-        _factory = new ConnectionFactory
-        {
-            HostName = settings.Host,
-            Port = settings.Port,
-            UserName = settings.Username,
-            Password = settings.Password,
-            AutomaticRecoveryEnabled = true
-        };
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await using var connection = await ConnectWithRetryAsync(stoppingToken);
+        await using var connection = await RabbitMqConnector.ConnectAsync(_logger, stoppingToken);
         if (connection is null)
         {
             return;
         }
-
-        connection.ConnectionShutdownAsync += (_, args) =>
-        {
-            _logger.LogWarning("RabbitMQ connection lost ({Reason}); automatic recovery is running.", args.ReplyText);
-            return Task.CompletedTask;
-        };
-        connection.RecoverySucceededAsync += (_, _) =>
-        {
-            _logger.LogInformation("RabbitMQ connection recovered.");
-            return Task.CompletedTask;
-        };
 
         await using var channel = await connection.CreateChannelAsync(cancellationToken: stoppingToken);
         await MessagingTopology.DeclareAsync(channel, stoppingToken);
@@ -72,32 +50,6 @@ public class RabbitMqConsumerService : BackgroundService
         {
             _logger.LogInformation("Worker is shutting down.");
         }
-    }
-
-    /// <summary>Keeps trying (1 s, 2 s, 4 s, then every 8 s) until RabbitMQ is reachable, logging every failure.</summary>
-    private async Task<IConnection?> ConnectWithRetryAsync(CancellationToken stoppingToken)
-    {
-        for (var attempt = 0; !stoppingToken.IsCancellationRequested; attempt++)
-        {
-            try
-            {
-                return await _factory.CreateConnectionAsync(stoppingToken);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                var delay = RetryPolicy.ConnectionDelay(attempt);
-                _logger.LogError(ex, "Cannot connect to RabbitMQ at {Host}:{Port} (attempt {Attempt}); retrying in {Delay}.", _factory.HostName, _factory.Port, attempt + 1, delay);
-                try
-                {
-                    await Task.Delay(delay, stoppingToken);
-                }
-                catch (OperationCanceledException)
-                {
-                    return null;
-                }
-            }
-        }
-        return null;
     }
 
     private async Task ProcessAsync(IChannel channel, BasicDeliverEventArgs delivery, CancellationToken stoppingToken)

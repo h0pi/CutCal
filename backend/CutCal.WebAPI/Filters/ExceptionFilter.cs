@@ -31,6 +31,14 @@ public class ExceptionFilter : IExceptionFilter
                 context.ExceptionHandled = true;
                 break;
 
+            case ServiceUnavailableException unavailableException:
+                context.Result = new ObjectResult(new { message = unavailableException.Message })
+                {
+                    StatusCode = StatusCodes.Status503ServiceUnavailable
+                };
+                context.ExceptionHandled = true;
+                break;
+
             default:
                 _logger.LogError(context.Exception, "Unhandled server error on {Path}", context.HttpContext.Request.Path);
                 context.Result = new ObjectResult(new { message = "Server side error, please check logs." })

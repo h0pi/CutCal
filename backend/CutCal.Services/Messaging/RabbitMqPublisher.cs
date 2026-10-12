@@ -1,5 +1,6 @@
 using System.Text.Json;
 using CutCal.Messaging;
+using CutCal.Model.Exceptions;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 
@@ -9,6 +10,9 @@ public interface IRabbitMqPublisher
 {
     /// <summary>Publishes an e-mail notification. Never throws: a broken broker must not fail the user's booking.</summary>
     Task PublishAsync(NotificationMessage message);
+
+    /// <summary>Asks the worker to retrain the recommender. Unlike e-mails, this throws <see cref="ServiceUnavailableException"/> when the broker cannot be reached, because an admin is waiting for the answer.</summary>
+    Task RequestRecommenderRetrainAsync();
 }
 
 /// <summary>
@@ -53,6 +57,21 @@ public class RabbitMqPublisher : IRabbitMqPublisher, IAsyncDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Could not publish {MessageType} for appointment {AppointmentId}; the customer will not get this e-mail.", message.Type, message.AppointmentId);
+        }
+    }
+
+    public async Task RequestRecommenderRetrainAsync()
+    {
+        try
+        {
+            var connection = await GetConnectionAsync();
+            await using var channel = await connection.CreateChannelAsync();
+            await channel.BasicPublishAsync(string.Empty, MessagingTopology.RetrainQueueName, mandatory: false, new BasicProperties { Persistent = true }, ReadOnlyMemory<byte>.Empty);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Could not publish the recommender retrain request.");
+            throw new ServiceUnavailableException("The retraining request could not be sent because the message broker is not reachable. Please try again shortly.");
         }
     }
 
