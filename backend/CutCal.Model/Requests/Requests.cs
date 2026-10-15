@@ -230,3 +230,8 @@ public class CaptureOrderRequest
     public string PaypalOrderId { get; set; } = null!;
     public int AppointmentId { get; set; }
 }
+
+public class StripePaymentRequest
+{
+    public int AppointmentId { get; set; }
+}

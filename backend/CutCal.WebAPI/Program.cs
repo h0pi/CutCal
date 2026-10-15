@@ -78,6 +78,7 @@ builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IFavoriteService, FavoriteService>();
 builder.Services.AddScoped<IGeocodingService, GeocodingService>();
 builder.Services.AddSingleton<IRabbitMqPublisher, RabbitMqPublisher>();
+builder.Services.AddSingleton<IStripeGateway, StripeGateway>();
 builder.Services.AddSingleton(RecommenderSettings.FromEnvironment());
 builder.Services.AddSingleton<IRecommenderModelProvider, RecommenderModelProvider>();
 

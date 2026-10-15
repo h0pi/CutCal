@@ -1,4 +1,7 @@
+using CutCal.Messaging;
 using CutCal.Recommender;
+using CutCal.Services.Auth;
+using CutCal.Services.Messaging;
 using CutCal.Services.Recommendation;
 using Microsoft.Extensions.Logging;
 
@@ -26,4 +29,31 @@ internal sealed class ListLogger<T> : ILogger<T>
         var values = state is IEnumerable<KeyValuePair<string, object?>> pairs ? pairs.ToDictionary(x => x.Key, x => x.Value) : new Dictionary<string, object?>();
         Entries.Add((logLevel, formatter(state, exception), values));
     }
+}
+
+/// <summary>Remembers the e-mail notifications the code asked to send.</summary>
+internal sealed class RecordingPublisher : IRabbitMqPublisher
+{
+    public List<NotificationMessage> Sent { get; } = new();
+
+    public Task PublishAsync(NotificationMessage message)
+    {
+        Sent.Add(message);
+        return Task.CompletedTask;
+    }
+
+    public Task RequestRecommenderRetrainAsync() => Task.CompletedTask;
+}
+
+internal sealed class SignedInUser : IAuthenticatedUserAccessor
+{
+    public SignedInUser(int userId, string role)
+    {
+        UserId = userId;
+        Role = role;
+    }
+
+    public int UserId { get; }
+    public string? Role { get; }
+    public bool IsInRole(string role) => role == Role;
 }

@@ -186,6 +186,12 @@ public class CreateOrderResponse
     public string ApprovalUrl { get; set; } = null!;
 }
 
+public class CreateCheckoutSessionResponse
+{
+    public string SessionId { get; set; } = null!;
+    public string CheckoutUrl { get; set; } = null!;
+}
+
 public class FavoriteResponse
 {
     public int UserId { get; set; }

@@ -31,6 +31,31 @@ public class PaymentsController : ControllerBase
         return Ok(await _service.CaptureOrderAsync(request.PaypalOrderId, request.AppointmentId));
     }
 
+    [HttpPost("CreateStripeSession")]
+    public async Task<ActionResult<CreateCheckoutSessionResponse>> CreateStripeSession([FromBody] StripePaymentRequest request)
+    {
+        return Ok(await _service.CreateStripeSessionAsync(request.AppointmentId));
+    }
+
+    [HttpPost("ConfirmStripePayment")]
+    public async Task<ActionResult<PaymentResponse>> ConfirmStripePayment([FromBody] StripePaymentRequest request)
+    {
+        return Ok(await _service.ConfirmStripePaymentAsync(request.AppointmentId));
+    }
+
+    /// <summary>
+    /// Called by Stripe, not by a signed-in user, so it cannot ask for a login: the signature in the header, checked against
+    /// the webhook secret, is what proves the call is genuine. The signature covers the exact bytes, so the body is read raw.
+    /// </summary>
+    [HttpPost("StripeWebhook")]
+    [AllowAnonymous]
+    public async Task<IActionResult> StripeWebhook()
+    {
+        using var reader = new StreamReader(Request.Body);
+        await _service.HandleStripeWebhookAsync(await reader.ReadToEndAsync(), Request.Headers["Stripe-Signature"].ToString());
+        return Ok();
+    }
+
     [HttpPost("Refund/{id:int}")]
     [Authorize(Roles = RoleNames.AdminOrManager)]
     public async Task<ActionResult<PaymentResponse>> Refund(int id)
