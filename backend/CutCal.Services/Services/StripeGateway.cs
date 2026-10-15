@@ -36,6 +36,9 @@ public interface IStripeGateway
     Task<StripeCheckoutSession> CreateCheckoutSessionAsync(StripeCheckoutRequest request);
     Task<StripeCheckoutSession> GetCheckoutSessionAsync(string sessionId);
 
+    /// <summary>Refunds a card payment. Asking again for the same payment never refunds it twice (Stripe returns the first refund).</summary>
+    Task RefundAsync(string paymentIntentId, long amountInMinorUnits);
+
     /// <summary>Reads a webhook call, but only when its signature proves it came from Stripe; throws <see cref="ClientException"/> otherwise.</summary>
     StripeWebhookEvent ReadWebhookEvent(string payload, string signatureHeader);
 }
@@ -89,6 +92,21 @@ public sealed class StripeGateway : IStripeGateway
 
     public Task<StripeCheckoutSession> GetCheckoutSessionAsync(string sessionId) =>
         CallAsync(() => new SessionService(Client).GetAsync(sessionId));
+
+    public async Task RefundAsync(string paymentIntentId, long amountInMinorUnits)
+    {
+        var options = new RefundCreateOptions { PaymentIntent = paymentIntentId, Amount = amountInMinorUnits };
+        var requestOptions = new RequestOptions { IdempotencyKey = $"refund-{paymentIntentId}" };
+        try
+        {
+            await new RefundService(Client).CreateAsync(options, requestOptions);
+        }
+        catch (StripeException ex)
+        {
+            _logger.LogError(ex, "Stripe refund failed.");
+            throw new ServiceUnavailableException("Stripe could not refund the payment. Please try again shortly.");
+        }
+    }
 
     public StripeWebhookEvent ReadWebhookEvent(string payload, string signatureHeader)
     {

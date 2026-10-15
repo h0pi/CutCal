@@ -34,6 +34,20 @@ public class StripePaymentServiceTests : IDisposable
 
         public StripeCheckoutSession Session(string sessionId) => _sessions[sessionId];
 
+        public List<(string PaymentIntentId, long Amount)> Refunds { get; } = new();
+        public bool RefundFails { get; set; }
+
+        public Task RefundAsync(string paymentIntentId, long amountInMinorUnits)
+        {
+            if (RefundFails)
+            {
+                throw new ServiceUnavailableException("Stripe could not refund the payment. Please try again shortly.");
+            }
+
+            Refunds.Add((paymentIntentId, amountInMinorUnits));
+            return Task.CompletedTask;
+        }
+
         public StripeWebhookEvent? NextWebhookEvent { get; set; }
 
         public StripeWebhookEvent ReadWebhookEvent(string payload, string signatureHeader) =>
@@ -378,5 +392,67 @@ public class StripePaymentServiceTests : IDisposable
 
         Assert.Equal(PaymentStatusNames.Unpaid, Appointment.PaymentStatus);
         Assert.Empty(_publisher.Sent);
+    }
+
+    private async Task PayAsync()
+    {
+        var session = await StartPaymentAsync();
+        _stripe.Pay(session);
+        await CustomerService().ConfirmStripePaymentAsync(AppointmentId);
+        _publisher.Sent.Clear();
+    }
+
+    private PaymentService AdminService() => ServiceFor(userId: 0, RoleNames.Admin);
+
+    [Fact]
+    public async Task Refunds_a_card_payment_through_Stripe_and_tells_the_customer()
+    {
+        await PayAsync();
+
+        var response = await AdminService().RefundAsync(AppointmentId);
+
+        var refund = Assert.Single(_stripe.Refunds);
+        Assert.Equal(("pi_test_1", PriceInCents), refund);
+        Assert.Equal(PaymentStatusNames.Refunded, response.Status);
+        Assert.Equal(PaymentStatusNames.Refunded, Appointment.PaymentStatus);
+        var message = Assert.Single(_publisher.Sent);
+        Assert.Equal(NotificationMessageTypes.PaymentRefunded, message.Type);
+        Assert.Equal(Price, message.Amount);
+        Assert.Single(_context.Notifications.Where(x => x.UserId == _customerId && x.Type == nameof(CutCal.Model.Enums.NotificationType.PaymentRefunded)));
+    }
+
+    [Fact]
+    public async Task Refunds_a_card_payment_only_once()
+    {
+        await PayAsync();
+        await AdminService().RefundAsync(AppointmentId);
+
+        await Assert.ThrowsAsync<ClientException>(() => AdminService().RefundAsync(AppointmentId));
+
+        Assert.Single(_stripe.Refunds);
+        Assert.Single(_publisher.Sent);
+    }
+
+    [Fact]
+    public async Task Keeps_the_payment_paid_when_Stripe_cannot_refund_it()
+    {
+        await PayAsync();
+        _stripe.RefundFails = true;
+
+        await Assert.ThrowsAsync<ServiceUnavailableException>(() => AdminService().RefundAsync(AppointmentId));
+
+        Assert.Equal(PaymentStatusNames.Paid, Appointment.PaymentStatus);
+        Assert.Equal(PaymentStatusNames.Paid, Appointment.Payment!.Status);
+        Assert.Empty(_publisher.Sent);
+    }
+
+    [Fact]
+    public async Task Does_not_refund_a_card_payment_that_was_never_paid()
+    {
+        await StartPaymentAsync();
+
+        await Assert.ThrowsAsync<ClientException>(() => AdminService().RefundAsync(AppointmentId));
+
+        Assert.Empty(_stripe.Refunds);
     }
 }

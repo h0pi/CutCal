@@ -352,6 +352,30 @@ public class PaymentService : IPaymentService
             throw new ClientException("Only paid appointments can be refunded.");
         }
 
+        if (payment.StripePaymentIntentId is not null)
+        {
+            await _stripe.RefundAsync(payment.StripePaymentIntentId, ToMinorUnits(payment.Amount));
+        }
+        else
+        {
+            await RefundPayPalAsync(payment);
+        }
+
+        payment.Status = PaymentStatusNames.Refunded;
+        appointment.PaymentStatus = PaymentStatusNames.Refunded;
+
+        _notificationService.Add(appointment.CustomerId, "Payment refunded",
+            $"Your payment of {payment.Amount:C} for the appointment at {appointment.Salon.Name} was refunded.",
+            nameof(CutCal.Model.Enums.NotificationType.PaymentRefunded));
+        await _context.SaveChangesAsync();
+
+        await _publisher.PublishAsync(BuildMessage(NotificationMessageTypes.PaymentRefunded, appointment, payment.Amount));
+
+        return MapPaymentResponse(payment);
+    }
+
+    private async Task RefundPayPalAsync(Payment payment)
+    {
         var request = new CapturesRefundRequest(payment.PaypalCaptureId);
         request.RequestBody(new PayPalCheckoutSdk.Payments.RefundRequest
         {
@@ -361,22 +385,10 @@ public class PaymentService : IPaymentService
         try
         {
             await _client.Execute(request);
-
-            payment.Status = PaymentStatusNames.Refunded;
-            appointment.PaymentStatus = PaymentStatusNames.Refunded;
-
-            _notificationService.Add(appointment.CustomerId, "Payment refunded",
-                $"Your payment of {payment.Amount:C} for the appointment at {appointment.Salon.Name} was refunded.",
-                nameof(CutCal.Model.Enums.NotificationType.PaymentRefunded));
-            await _context.SaveChangesAsync();
-
-            await _publisher.PublishAsync(BuildMessage(NotificationMessageTypes.PaymentRefunded, appointment, payment.Amount));
-
-            return MapPaymentResponse(payment);
         }
         catch (HttpException ex)
         {
-            _logger.LogError(ex, "PayPal Refund failed for appointment {AppointmentId}", appointmentId);
+            _logger.LogError(ex, "PayPal Refund failed for appointment {AppointmentId}", payment.AppointmentId);
             throw new ClientException("Unable to refund PayPal payment.");
         }
     }
