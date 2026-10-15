@@ -82,11 +82,13 @@ Every seeded account uses the password `test`.
 | Više korisničkih uloga: Customer | `customer` | `test` |
 | Više korisničkih uloga: Staff | `staff1` | `test` |
 | PayPal sandbox test kupac (za plaćanje termina u mobilnoj app) | `sb-tmzjs52890786@personal.example.com` | `8E#QQuao` |
+| Stripe test kartica (opcija Card u mobilnoj app) | `4242 4242 4242 4242` | bilo koji budući datum isteka i bilo koji CVC |
 
 Logging out invalidates the access token on the server (it is blacklisted until it would have expired) and deletes the refresh token, so a token copied before logout stops working.
 
 ## Notes
 
+- Payments: Cash, PayPal (sandbox) and card through Stripe Checkout (test mode). The customer enters the card on Stripe's own page, the server asks Stripe whether it was paid and checks the amount before marking the appointment paid, and Stripe also confirms by a signed webhook (`POST /Payments/StripeWebhook`) in case the app is closed first. Admins and managers refund through `POST /Payments/Refund/{id}` for either method; cancelling a paid appointment refunds it automatically. To receive webhooks locally run `stripe listen --forward-to localhost:5194/Payments/StripeWebhook` and put the printed `whsec_...` value in `.env` as `Stripe__WebhookSecret`; payment methods other than cards are switched off in the Stripe Dashboard (Settings > Payment methods).
 - Notifications are refreshed by polling (`GET /Notifications`), not SignalR.
 - Server-side validation: every request object has a FluentValidation validator that runs before the action; errors state the expected format (for example the phone number pattern) and are shown to the user.
 - Recommender: hybrid and explainable; the personal part is a matrix factorization model trained by the worker. Algorithm, data, training, evaluation and source are described in `recommender-dokumentacija.md`.
