@@ -275,8 +275,8 @@ public class AppointmentInsertRequestValidator : AbstractValidator<AppointmentIn
         RuleFor(x => x.SalonId).GreaterThan(0).WithMessage("Choose a salon.");
         RuleFor(x => x.StaffId).GreaterThan(0).WithMessage("Choose a stylist.");
         RuleFor(x => x.ServiceId).GreaterThan(0).WithMessage("Choose a service.");
-        RuleFor(x => x.PaymentMethod).Must(x => x is PaymentMethodNames.Cash or PaymentMethodNames.PayPal)
-            .WithMessage($"Payment method must be {PaymentMethodNames.Cash} or {PaymentMethodNames.PayPal}.");
+        RuleFor(x => x.PaymentMethod).Must(x => x is PaymentMethodNames.Cash or PaymentMethodNames.PayPal or PaymentMethodNames.Stripe)
+            .WithMessage($"Payment method must be {PaymentMethodNames.Cash}, {PaymentMethodNames.PayPal} or {PaymentMethodNames.Stripe}.");
     }
 }
 

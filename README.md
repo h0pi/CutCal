@@ -38,7 +38,7 @@ This starts:
 
 Database migrations are applied automatically on API startup, and seed data (salons, users, services, appointments, reviews) is inserted the first time the database is created.
 
-All configuration (JWT key, SMTP, PayPal, RabbitMQ credentials, geocoding) is read from `.env` (see `.env.example`); nothing is hardcoded in `appsettings.json`.
+All configuration (JWT key, SMTP, PayPal, Stripe, RabbitMQ credentials, geocoding) is read from `.env` (see `.env.example`); nothing is hardcoded in `appsettings.json`.
 `docker-compose` only overrides the two values that differ inside containers (database connection string and RabbitMQ host), so the same `.env` works for Docker and for running locally. The compose file waits for SQL Server and RabbitMQ health checks before starting the API and the worker, and image tags are pinned.
 
 ## Running the backend locally without Docker

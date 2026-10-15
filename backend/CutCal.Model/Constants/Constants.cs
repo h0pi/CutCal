@@ -27,6 +27,7 @@ public static class PaymentMethodNames
 {
     public const string Cash = nameof(PaymentMethod.Cash);
     public const string PayPal = nameof(PaymentMethod.PayPal);
+    public const string Stripe = nameof(PaymentMethod.Stripe);
 }
 
 public static class PaymentStatusNames
@@ -35,6 +36,6 @@ public static class PaymentStatusNames
     public const string Paid = nameof(PaymentStatus.Paid);
     public const string Refunded = nameof(PaymentStatus.Refunded);
 
-    /// <summary>A PayPal order exists but has not been captured yet (Payments.Status only).</summary>
+    /// <summary>A PayPal order or Stripe checkout session exists but has not been paid yet (Payments.Status only).</summary>
     public const string Created = "Created";
 }

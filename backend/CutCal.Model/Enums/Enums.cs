@@ -11,7 +11,8 @@ public enum AppointmentStatus
 public enum PaymentMethod
 {
     Cash,
-    PayPal
+    PayPal,
+    Stripe
 }
 
 public enum PaymentStatus

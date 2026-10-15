@@ -229,6 +229,8 @@ public class Payment
     public Appointment Appointment { get; set; } = null!;
     public string? PaypalOrderId { get; set; }
     public string? PaypalCaptureId { get; set; }
+    public string? StripeSessionId { get; set; }
+    public string? StripePaymentIntentId { get; set; }
     public decimal Amount { get; set; }
     public string Currency { get; set; } = "USD";
     public string Status { get; set; } = null!;
