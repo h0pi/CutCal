@@ -160,6 +160,18 @@ class PaymentProvider extends BaseProvider<Map<String, dynamic>> {
     ));
     return Map<String, dynamic>.from(validateResponse(response));
   }
+
+  Future<Map<String, dynamic>> createStripeSession(int appointmentId) async {
+    final uri = Uri.parse('${AuthProvider.baseUrl}Payments/CreateStripeSession');
+    final response = await sendRequest(http.post(uri, headers: createHeaders(), body: jsonEncode({'appointmentId': appointmentId})));
+    return Map<String, dynamic>.from(validateResponse(response));
+  }
+
+  Future<Map<String, dynamic>> confirmStripePayment(int appointmentId) async {
+    final uri = Uri.parse('${AuthProvider.baseUrl}Payments/ConfirmStripePayment');
+    final response = await sendRequest(http.post(uri, headers: createHeaders(), body: jsonEncode({'appointmentId': appointmentId})));
+    return Map<String, dynamic>.from(validateResponse(response));
+  }
 }
 
 class AvailabilityProvider extends BaseProvider<AvailabilityDayModel> {

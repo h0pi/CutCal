@@ -8,6 +8,7 @@ import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/utils_widgets.dart';
 import 'paypal_webview_screen.dart';
+import 'stripe_checkout_screen.dart';
 
 class PaymentScreen extends StatefulWidget {
   final SalonModel salon;
@@ -113,6 +114,43 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
   }
 
+  Future<void> _payWithCard() async {
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: 'Pay by card',
+      message: 'Book ${widget.service.name} and pay \$${widget.service.price.toStringAsFixed(2)} now by card?',
+      confirmLabel: 'Pay now',
+      isDestructive: false,
+    );
+    if (!confirmed) return;
+
+    setState(() => _isProcessing = true);
+    try {
+      final appointment = await context.read<AppointmentProvider>().insert({
+        'salonId': widget.salon.id,
+        'staffId': widget.staff.id,
+        'serviceId': widget.service.id,
+        'scheduledAt': widget.scheduledAt.toIso8601String(),
+        'paymentMethod': 'Stripe',
+      });
+
+      if (!mounted) return;
+      final paid = await payWithStripe(context, appointment.id);
+      if (!mounted) return;
+
+      if (paid) {
+        showSuccessSnackBar(context, 'Payment successful! Appointment booked for ${DateFormat('MMM d, y • HH:mm').format(widget.scheduledAt)}.');
+      } else {
+        showErrorSnackBar(context, 'Payment was not completed. Your appointment is booked but still unpaid — try again from your bookings.');
+      }
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } on ApiClientException catch (e) {
+      if (mounted) showErrorSnackBar(context, e.message);
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -166,6 +204,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   title: 'PayPal',
                   subtitle: 'Sandbox checkout · buyer protection',
                   onTap: _payWithPayPal,
+                ),
+                const SizedBox(height: 10),
+                _paymentTile(
+                  badgeColor: const Color(0xFF635BFF),
+                  badgeLabel: 'S',
+                  title: 'Card',
+                  subtitle: 'Secure checkout by Stripe',
+                  onTap: _payWithCard,
                 ),
                 const SizedBox(height: 16),
                 const Text(

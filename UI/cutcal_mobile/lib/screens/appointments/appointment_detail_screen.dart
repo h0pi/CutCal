@@ -9,6 +9,7 @@ import '../../utils/app_theme.dart';
 import '../../utils/utils_widgets.dart';
 import '../reviews/add_review_screen.dart';
 import 'reschedule_sheet.dart';
+import 'stripe_checkout_screen.dart';
 
 class AppointmentDetailScreen extends StatefulWidget {
   final int appointmentId;
@@ -91,13 +92,25 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
     final confirmed = await showConfirmationDialog(
       context,
       title: 'Confirm payment',
-      message: 'Pay \$${_appointment!.price.toStringAsFixed(2)} via PayPal for this appointment?',
+      message: 'Pay \$${_appointment!.price.toStringAsFixed(2)} via ${_appointment!.paymentMethod == 'Stripe' ? 'card' : 'PayPal'} for this appointment?',
       confirmLabel: 'Pay now',
       isDestructive: false,
     );
-    if (!confirmed) return;
+    if (!confirmed || !mounted) return;
 
     try {
+      if (_appointment!.paymentMethod == 'Stripe') {
+        final paid = await payWithStripe(context, widget.appointmentId);
+        if (!mounted) return;
+        if (paid) {
+          showSuccessSnackBar(context, 'Payment completed successfully.');
+          _load();
+        } else {
+          showErrorSnackBar(context, 'Payment was not completed.');
+        }
+        return;
+      }
+
       final paymentProvider = context.read<PaymentProvider>();
       final order = await paymentProvider.createOrder(widget.appointmentId);
       // TODO: open order['approvalUrl'] in an in-app PayPal WebView/SDK flow and
@@ -150,7 +163,7 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
     final canCancel = a.stateName == 'Pending' || a.stateName == 'Confirmed';
     final canReschedule = a.stateName == 'Pending' || a.stateName == 'Confirmed';
     final canReview = a.stateName == 'Completed' && !a.hasReview;
-    final canPay = a.paymentMethod == 'PayPal' && a.paymentStatus == 'Unpaid';
+    final canPay = (a.paymentMethod == 'PayPal' || a.paymentMethod == 'Stripe') && a.paymentStatus == 'Unpaid';
     final (heroBg, heroText) = _heroColorsFor(a.stateName);
 
     return Scaffold(

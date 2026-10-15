@@ -12,6 +12,7 @@ import '../../utils/app_theme.dart';
 import '../../utils/utils_widgets.dart';
 import 'appointment_detail_screen.dart';
 import 'reschedule_sheet.dart';
+import 'stripe_checkout_screen.dart';
 
 class MyAppointmentsScreen extends StatefulWidget {
   const MyAppointmentsScreen({super.key});
@@ -133,7 +134,7 @@ class _AppointmentCard extends StatelessWidget {
 
   bool get _canReschedule => appointment.stateName == 'Pending' || appointment.stateName == 'Confirmed';
   bool get _canCancel => appointment.stateName == 'Pending' || appointment.stateName == 'Confirmed';
-  bool get _canPay => appointment.paymentMethod == 'PayPal' && appointment.paymentStatus == 'Unpaid';
+  bool get _canPay => (appointment.paymentMethod == 'PayPal' || appointment.paymentMethod == 'Stripe') && appointment.paymentStatus == 'Unpaid';
 
   Future<void> _openDetail(BuildContext context) async {
     await Navigator.of(context).push(
@@ -174,13 +175,25 @@ class _AppointmentCard extends StatelessWidget {
     final confirmed = await showConfirmationDialog(
       context,
       title: 'Confirm payment',
-      message: 'Pay \$${appointment.price.toStringAsFixed(2)} via PayPal for this appointment?',
+      message: 'Pay \$${appointment.price.toStringAsFixed(2)} via ${appointment.paymentMethod == 'Stripe' ? 'card' : 'PayPal'} for this appointment?',
       confirmLabel: 'Pay now',
       isDestructive: false,
     );
-    if (!confirmed) return;
+    if (!confirmed || !context.mounted) return;
 
     try {
+      if (appointment.paymentMethod == 'Stripe') {
+        final paid = await payWithStripe(context, appointment.id);
+        if (!context.mounted) return;
+        if (paid) {
+          showSuccessSnackBar(context, 'Payment completed successfully.');
+          onChanged();
+        } else {
+          showErrorSnackBar(context, 'Payment was not completed.');
+        }
+        return;
+      }
+
       final paymentProvider = context.read<PaymentProvider>();
       final order = await paymentProvider.createOrder(appointment.id);
       // TODO: open order['approvalUrl'] in an in-app PayPal WebView/SDK flow and
