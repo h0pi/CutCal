@@ -21,6 +21,13 @@ class SalonProvider extends BaseProvider<SalonModel> {
   @override
   SalonModel fromJson(json) => SalonModel.fromJson(json);
 
+  /// Saves only the settings that are given; the profile is saved apart (see [update]) so neither can undo the other.
+  Future<void> updateSettings(int salonId, Map<String, dynamic> settings) async {
+    final uri = Uri.parse('${AuthProvider.baseUrl}Salons/$salonId/Settings');
+    final response = await sendRequest(http.put(uri, headers: createHeaders(), body: jsonEncode(settings)));
+    validateResponse(response);
+  }
+
   Future<List<SalonGalleryModel>> getGallery(int salonId) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}Salons/$salonId/Gallery');
     final response = await sendRequest(http.get(uri, headers: createHeaders()));
@@ -145,9 +152,15 @@ class PaymentProvider extends BaseProvider<Map<String, dynamic>> {
   @override
   Map<String, dynamic> fromJson(json) => Map<String, dynamic>.from(json);
 
-  Future<Map<String, dynamic>> createOrder(int appointmentId) async {
+  Future<Map<String, dynamic>> getQuote(int appointmentId, TipChoice tip) async {
+    final uri = Uri.parse('${AuthProvider.baseUrl}Payments/Quote${getQueryString({'appointmentId': appointmentId, ...tip.toJson()})}');
+    final response = await sendRequest(http.get(uri, headers: createHeaders()));
+    return Map<String, dynamic>.from(validateResponse(response));
+  }
+
+  Future<Map<String, dynamic>> createOrder(int appointmentId, TipChoice tip) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}Payments/CreateOrder');
-    final response = await sendRequest(http.post(uri, headers: createHeaders(), body: jsonEncode({'appointmentId': appointmentId})));
+    final response = await sendRequest(http.post(uri, headers: createHeaders(), body: jsonEncode({'appointmentId': appointmentId, ...tip.toJson()})));
     return Map<String, dynamic>.from(validateResponse(response));
   }
 
@@ -161,9 +174,9 @@ class PaymentProvider extends BaseProvider<Map<String, dynamic>> {
     return Map<String, dynamic>.from(validateResponse(response));
   }
 
-  Future<Map<String, dynamic>> createStripeSession(int appointmentId) async {
+  Future<Map<String, dynamic>> createStripeSession(int appointmentId, TipChoice tip) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}Payments/CreateStripeSession');
-    final response = await sendRequest(http.post(uri, headers: createHeaders(), body: jsonEncode({'appointmentId': appointmentId})));
+    final response = await sendRequest(http.post(uri, headers: createHeaders(), body: jsonEncode({'appointmentId': appointmentId, ...tip.toJson()})));
     return Map<String, dynamic>.from(validateResponse(response));
   }
 
@@ -195,7 +208,6 @@ class AvailabilityProvider extends BaseProvider<AvailabilityDayModel> {
       'staffId': staffId,
       'from': _dateOnly(from),
       'days': days,
-      'nowLocal': DateTime.now().toIso8601String(),
     });
     final uri = Uri.parse('${AuthProvider.baseUrl}Salons/$salonId/Availability/Days$query');
     final response = await sendRequest(http.get(uri, headers: createHeaders()));
@@ -215,7 +227,6 @@ class AvailabilityProvider extends BaseProvider<AvailabilityDayModel> {
       'staffId': staffId,
       'date': _dateOnly(date),
       'excludeAppointmentId': excludeAppointmentId,
-      'nowLocal': DateTime.now().toIso8601String(),
     });
     final uri = Uri.parse('${AuthProvider.baseUrl}Salons/$salonId/Availability/Slots$query');
     final response = await sendRequest(http.get(uri, headers: createHeaders()));

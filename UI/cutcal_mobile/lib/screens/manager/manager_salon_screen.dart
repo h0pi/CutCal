@@ -194,8 +194,9 @@ class _ManagerSalonScreenState extends State<ManagerSalonScreen> {
   Future<void> _save() async {
     if (_salon == null) return;
     setState(() => _isSaving = true);
+    final salons = context.read<SalonProvider>();
     try {
-      await context.read<SalonProvider>().update(_salon!.id, {
+      await salons.update(_salon!.id, {
         'name': _nameController.text.trim(),
         'salonCategoryId': _salon!.salonCategoryId,
         'description': _bioController.text.trim(),
@@ -206,9 +207,8 @@ class _ManagerSalonScreenState extends State<ManagerSalonScreen> {
         'phone': _phoneController.text.trim(),
         'email': _salon!.email,
         'profileImageUrl': _salon!.profileImageUrl,
-        'autoConfirm': _salon!.autoConfirm,
-        'workingHours': _hours.map((h) => h.toJson()).toList(),
       });
+      await salons.updateSettings(_salon!.id, {'workingHours': _hours.map((h) => h.toJson()).toList()});
       if (mounted) showSuccessSnackBar(context, 'Salon profile updated.');
       _load();
     } on ApiClientException catch (e) {

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
@@ -9,10 +8,11 @@ import '../../providers/auth_provider.dart';
 import '../../providers/entity_providers.dart';
 import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/format.dart';
 import '../../utils/utils_widgets.dart';
 import 'appointment_detail_screen.dart';
+import 'pay_screen.dart';
 import 'reschedule_sheet.dart';
-import 'stripe_checkout_screen.dart';
 
 class MyAppointmentsScreen extends StatefulWidget {
   const MyAppointmentsScreen({super.key});
@@ -134,7 +134,7 @@ class _AppointmentCard extends StatelessWidget {
 
   bool get _canReschedule => appointment.stateName == 'Pending' || appointment.stateName == 'Confirmed';
   bool get _canCancel => appointment.stateName == 'Pending' || appointment.stateName == 'Confirmed';
-  bool get _canPay => (appointment.paymentMethod == 'PayPal' || appointment.paymentMethod == 'Stripe') && appointment.paymentStatus == 'Unpaid';
+  bool get _canPay => appointment.canBePaid;
 
   Future<void> _openDetail(BuildContext context) async {
     await Navigator.of(context).push(
@@ -172,40 +172,11 @@ class _AppointmentCard extends StatelessWidget {
   }
 
   Future<void> _pay(BuildContext context) async {
-    final confirmed = await showConfirmationDialog(
-      context,
-      title: 'Confirm payment',
-      message: 'Pay \$${appointment.price.toStringAsFixed(2)} via ${appointment.paymentMethod == 'Stripe' ? 'card' : 'PayPal'} for this appointment?',
-      confirmLabel: 'Pay now',
-      isDestructive: false,
-    );
-    if (!confirmed || !context.mounted) return;
+    final paid = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => PayScreen(appointment: appointment)));
+    if (paid != true || !context.mounted) return;
 
-    try {
-      if (appointment.paymentMethod == 'Stripe') {
-        final paid = await payWithStripe(context, appointment.id);
-        if (!context.mounted) return;
-        if (paid) {
-          showSuccessSnackBar(context, 'Payment completed successfully.');
-          onChanged();
-        } else {
-          showErrorSnackBar(context, 'Payment was not completed.');
-        }
-        return;
-      }
-
-      final paymentProvider = context.read<PaymentProvider>();
-      final order = await paymentProvider.createOrder(appointment.id);
-      // TODO: open order['approvalUrl'] in an in-app PayPal WebView/SDK flow and
-      // return the resulting orderId here rather than capturing immediately.
-      await paymentProvider.captureOrder(order['orderId'], appointment.id);
-      if (context.mounted) {
-        showSuccessSnackBar(context, 'Payment completed successfully.');
-        onChanged();
-      }
-    } on ApiClientException catch (e) {
-      if (context.mounted) showErrorSnackBar(context, e.message);
-    }
+    showSuccessSnackBar(context, 'Payment completed successfully.');
+    onChanged();
   }
 
   @override
@@ -244,7 +215,7 @@ class _AppointmentCard extends StatelessWidget {
               children: [
                 const Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.textSecondary),
                 const SizedBox(width: 6),
-                Text(DateFormat('MMM d, y • HH:mm').format(a.scheduledAt), style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                Text(formatDateTime(a.scheduledAt, is24Hour: a.is24HourFormat), style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
                 if (a.staffName != null) ...[
                   const SizedBox(width: 14),
                   const Icon(Icons.person_outline, size: 14, color: AppColors.textSecondary),
@@ -262,7 +233,7 @@ class _AppointmentCard extends StatelessWidget {
                       child: FilledButton(
                         style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(38), padding: EdgeInsets.zero),
                         onPressed: () => _pay(context),
-                        child: Text('Pay \$${a.price.toStringAsFixed(2)}', style: const TextStyle(fontSize: 13)),
+                        child: const Text('Pay now', style: TextStyle(fontSize: 13)),
                       ),
                     ),
                   if (_canPay && (_canReschedule || _canCancel)) const SizedBox(width: 8),

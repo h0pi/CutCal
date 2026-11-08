@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../providers/entity_providers.dart';
 import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/format.dart';
 import '../../utils/utils_widgets.dart';
 import 'availability_picker.dart';
 import 'payment_screen.dart';
@@ -169,7 +169,7 @@ class _BookingScreenState extends State<BookingScreen> {
               },
               title: s.name,
               subtitle: '${s.durationMinutes} min · ${s.description ?? ''}',
-              trailing: '\$${s.price.toStringAsFixed(0)}',
+              trailing: formatMoney(s.price, widget.salon.currency, decimals: 0),
             );
           },
         );
@@ -227,6 +227,7 @@ class _BookingScreenState extends State<BookingScreen> {
           salonId: widget.salon.id,
           serviceId: _selectedService!.id,
           staffId: _selectedStaff!.id,
+          is24HourFormat: widget.salon.is24HourFormat,
           onChanged: (start) => setState(() => _selectedStart = start),
         ),
         const SizedBox(height: 20),
@@ -240,9 +241,10 @@ class _BookingScreenState extends State<BookingScreen> {
               const SizedBox(height: 10),
               _summaryRow('Service', _selectedService?.name ?? '-'),
               _summaryRow('Stylist', _selectedStaff?.fullName ?? '-'),
-              _summaryRow('When', _selectedStart == null ? 'pick a time' : DateFormat('MMM d · HH:mm').format(_selectedStart!)),
+              _summaryRow('When', _selectedStart == null ? 'pick a time' : formatDateTime(_selectedStart!, is24Hour: widget.salon.is24HourFormat, datePattern: 'MMM d')),
+              _summaryRow('Time zone', widget.salon.timeZone),
               _summaryRow('Duration', '${_selectedService?.durationMinutes ?? 0} min'),
-              _summaryRow('Price', '\$${(_selectedService?.price ?? 0).toStringAsFixed(2)}'),
+              _summaryRow('Price', formatMoney(_selectedService?.price ?? 0, widget.salon.currency)),
             ],
           ),
         ),

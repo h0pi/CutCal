@@ -1,13 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../providers/entity_providers.dart';
 import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/format.dart';
 import '../../utils/utils_widgets.dart';
 
 class ManagerAppointmentsScreen extends StatefulWidget {
@@ -19,9 +19,14 @@ class ManagerAppointmentsScreen extends StatefulWidget {
 
 class _ManagerAppointmentsScreenState extends State<ManagerAppointmentsScreen> {
   static const _statuses = ['All', 'Pending', 'Confirmed', 'Completed', 'Cancelled'];
+  static const _pageSize = 100; // the most the API returns per page
   String _status = 'All';
   List<AppointmentModel> _appointments = [];
+  int _page = 0;
+  int _totalCount = 0;
   bool _isLoading = true;
+  bool _isLoadingMore = false;
+  final _scrollController = ScrollController();
   String? _loadError;
   Timer? _pollTimer;
 
@@ -30,15 +35,21 @@ class _ManagerAppointmentsScreenState extends State<ManagerAppointmentsScreen> {
     super.initState();
     _load();
     _pollTimer = Timer.periodic(const Duration(seconds: 15), (_) => _load(silent: true));
+    _scrollController.addListener(() {
+      if (_scrollController.position.extentAfter < 300) _loadMore();
+    });
   }
 
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _scrollController.dispose();
     super.dispose();
   }
 
   Future<void> _load({bool silent = false}) async {
+    // Refreshing the first page would throw away the pages the manager has already scrolled to.
+    if (silent && _page > 0) return;
     if (!silent) {
       setState(() {
         _isLoading = true;
@@ -49,11 +60,14 @@ class _ManagerAppointmentsScreenState extends State<ManagerAppointmentsScreen> {
       // Auto-scoped server-side to salons this manager owns.
       final result = await context.read<AppointmentProvider>().get(filter: {
         'status': _status == 'All' ? null : _status,
-        'pageSize': 200,
+        'page': 0,
+        'pageSize': _pageSize,
       });
       if (!mounted) return;
       setState(() {
         _appointments = result.items;
+        _totalCount = result.totalCount;
+        _page = 0;
         _isLoading = false;
       });
     } on ApiClientException catch (e) {
@@ -66,6 +80,27 @@ class _ManagerAppointmentsScreenState extends State<ManagerAppointmentsScreen> {
         _loadError = e.message;
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_isLoadingMore || _appointments.length >= _totalCount) return;
+    setState(() => _isLoadingMore = true);
+    try {
+      final result = await context.read<AppointmentProvider>().get(filter: {
+        'status': _status == 'All' ? null : _status,
+        'page': _page + 1,
+        'pageSize': _pageSize,
+      });
+      if (!mounted) return;
+      setState(() {
+        _appointments = [..._appointments, ...result.items];
+        _page++;
+      });
+    } on ApiClientException catch (e) {
+      if (mounted) showErrorSnackBar(context, e.message);
+    } finally {
+      if (mounted) setState(() => _isLoadingMore = false);
     }
   }
 
@@ -144,6 +179,7 @@ class _ManagerAppointmentsScreenState extends State<ManagerAppointmentsScreen> {
                     : _appointments.isEmpty
                         ? const Center(child: Text('No appointments here.', style: TextStyle(color: AppColors.textSecondary)))
                         : ListView.separated(
+                        controller: _scrollController,
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                         itemCount: _appointments.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 12),
@@ -174,7 +210,7 @@ class _ManagerAppointmentsScreenState extends State<ManagerAppointmentsScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '${a.staffName ?? ''} • ${DateFormat('MMM d, y • HH:mm').format(a.scheduledAt)}',
+                                  '${a.staffName ?? ''} • ${formatDateTime(a.scheduledAt, is24Hour: a.is24HourFormat)}',
                                   style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                                 ),
                                 if (a.cancellationReason != null)

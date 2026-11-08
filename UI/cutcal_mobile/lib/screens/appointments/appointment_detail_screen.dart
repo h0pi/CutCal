@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../providers/entity_providers.dart';
 import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/format.dart';
 import '../../utils/utils_widgets.dart';
 import '../reviews/add_review_screen.dart';
+import 'pay_screen.dart';
 import 'reschedule_sheet.dart';
-import 'stripe_checkout_screen.dart';
 
 class AppointmentDetailScreen extends StatefulWidget {
   final int appointmentId;
@@ -89,40 +89,11 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
   }
 
   Future<void> _pay() async {
-    final confirmed = await showConfirmationDialog(
-      context,
-      title: 'Confirm payment',
-      message: 'Pay \$${_appointment!.price.toStringAsFixed(2)} via ${_appointment!.paymentMethod == 'Stripe' ? 'card' : 'PayPal'} for this appointment?',
-      confirmLabel: 'Pay now',
-      isDestructive: false,
-    );
-    if (!confirmed || !mounted) return;
+    final paid = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => PayScreen(appointment: _appointment!)));
+    if (paid != true || !mounted) return;
 
-    try {
-      if (_appointment!.paymentMethod == 'Stripe') {
-        final paid = await payWithStripe(context, widget.appointmentId);
-        if (!mounted) return;
-        if (paid) {
-          showSuccessSnackBar(context, 'Payment completed successfully.');
-          _load();
-        } else {
-          showErrorSnackBar(context, 'Payment was not completed.');
-        }
-        return;
-      }
-
-      final paymentProvider = context.read<PaymentProvider>();
-      final order = await paymentProvider.createOrder(widget.appointmentId);
-      // TODO: open order['approvalUrl'] in an in-app PayPal WebView/SDK flow and
-      // return the resulting orderId here rather than capturing immediately.
-      await paymentProvider.captureOrder(order['orderId'], widget.appointmentId);
-      if (mounted) {
-        showSuccessSnackBar(context, 'Payment completed successfully.');
-        _load();
-      }
-    } on ApiClientException catch (e) {
-      if (mounted) showErrorSnackBar(context, e.message);
-    }
+    showSuccessSnackBar(context, 'Payment completed successfully.');
+    _load();
   }
 
   static const _cardDecoration = BoxDecoration(
@@ -163,7 +134,7 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
     final canCancel = a.stateName == 'Pending' || a.stateName == 'Confirmed';
     final canReschedule = a.stateName == 'Pending' || a.stateName == 'Confirmed';
     final canReview = a.stateName == 'Completed' && !a.hasReview;
-    final canPay = (a.paymentMethod == 'PayPal' || a.paymentMethod == 'Stripe') && a.paymentStatus == 'Unpaid';
+    final canPay = a.canBePaid;
     final (heroBg, heroText) = _heroColorsFor(a.stateName);
 
     return Scaffold(
@@ -198,7 +169,7 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
                   children: [
                     Icon(Icons.calendar_today_outlined, size: 15, color: heroText.withValues(alpha: 0.85)),
                     const SizedBox(width: 6),
-                    Text(DateFormat('MMM d, y • HH:mm').format(a.scheduledAt), style: TextStyle(color: heroText.withValues(alpha: 0.85), fontSize: 13)),
+                    Text(formatDateTime(a.scheduledAt, is24Hour: a.is24HourFormat), style: TextStyle(color: heroText.withValues(alpha: 0.85), fontSize: 13)),
                   ],
                 ),
                 if (a.staffName != null) ...[
@@ -220,9 +191,10 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
             decoration: _cardDecoration,
             child: Column(
               children: [
+                _infoRow('Time zone', a.timeZone),
                 _infoRow('Duration', '${a.durationMinutes} min'),
                 const Divider(height: 20, color: Color(0xFFEDEAF4)),
-                _infoRow('Price', '\$${a.price.toStringAsFixed(2)}'),
+                _infoRow('Price', formatMoney(a.price, a.currency)),
                 const Divider(height: 20, color: Color(0xFFEDEAF4)),
                 _infoRow('Payment', '${a.paymentMethod} • ${a.paymentStatus}'),
                 if (a.cancellationReason != null) ...[
@@ -236,7 +208,7 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
           if (canPay)
             SizedBox(
               width: double.infinity,
-              child: FilledButton(onPressed: _pay, child: Text('Pay \$${a.price.toStringAsFixed(2)}')),
+              child: FilledButton(onPressed: _pay, child: const Text('Pay now')),
             ),
           if (canReview) ...[
             if (canPay) const SizedBox(height: 10),

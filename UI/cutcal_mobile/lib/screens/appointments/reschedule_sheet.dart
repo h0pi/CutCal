@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../providers/entity_providers.dart';
 import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/format.dart';
 import '../../utils/utils_widgets.dart';
 import 'availability_picker.dart';
 
@@ -43,7 +43,7 @@ class _RescheduleSheetState extends State<_RescheduleSheet> {
     final confirmed = await showConfirmationDialog(
       context,
       title: 'Confirm new time',
-      message: 'Move this appointment to ${DateFormat('MMM d, y • HH:mm').format(newScheduledAt)}?',
+      message: 'Move this appointment to ${formatDateTime(newScheduledAt, is24Hour: widget.appointment.is24HourFormat)}?',
       confirmLabel: 'Confirm new time',
       isDestructive: false,
     );
@@ -53,7 +53,7 @@ class _RescheduleSheetState extends State<_RescheduleSheet> {
     try {
       await context.read<AppointmentProvider>().reschedule(widget.appointment.id, newScheduledAt);
       if (mounted) {
-        showSuccessSnackBar(context, 'Appointment moved to ${DateFormat('MMM d, y • HH:mm').format(newScheduledAt)}.');
+        showSuccessSnackBar(context, 'Appointment moved to ${formatDateTime(newScheduledAt, is24Hour: widget.appointment.is24HourFormat)}.');
         Navigator.of(context).pop(true);
       }
     } on ApiClientException catch (e) {
@@ -84,7 +84,7 @@ class _RescheduleSheetState extends State<_RescheduleSheet> {
                   const SizedBox(height: 16),
                   const Text('Reschedule', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
                   Text(
-                    '${a.serviceName ?? ''} · currently ${DateFormat('MMM d, y • HH:mm').format(a.scheduledAt)}',
+                    '${a.serviceName ?? ''} · currently ${formatDateTime(a.scheduledAt, is24Hour: a.is24HourFormat)}',
                     style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                   ),
                   const SizedBox(height: 16),
@@ -99,6 +99,7 @@ class _RescheduleSheetState extends State<_RescheduleSheet> {
                   serviceId: a.serviceId,
                   staffId: a.staffId,
                   excludeAppointmentId: a.id,
+                  is24HourFormat: a.is24HourFormat,
                   onChanged: (start) => setState(() => _selectedStart = start),
                 ),
               ),

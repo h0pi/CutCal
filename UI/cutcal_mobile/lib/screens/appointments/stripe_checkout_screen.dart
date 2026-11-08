@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import '../../models/models.dart';
 import '../../providers/entity_providers.dart';
 import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
@@ -11,9 +12,9 @@ const _cancelUrlPrefix = 'https://cutcal.app/stripe/cancel';
 
 /// Pays an appointment by card: the customer enters the card on Stripe's own hosted page, so CutCal never sees it.
 /// Returns true once the server has confirmed with Stripe that the payment went through, false if the customer backed out.
-Future<bool> payWithStripe(BuildContext context, int appointmentId) async {
+Future<bool> payWithStripe(BuildContext context, int appointmentId, TipChoice tip) async {
   final paymentProvider = context.read<PaymentProvider>();
-  final session = await paymentProvider.createStripeSession(appointmentId);
+  final session = await paymentProvider.createStripeSession(appointmentId, tip);
   final checkoutUrl = session['checkoutUrl'] as String?;
   if (checkoutUrl == null || checkoutUrl.isEmpty) {
     throw ApiClientException('Stripe did not return a checkout link. Please try again.');

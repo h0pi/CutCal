@@ -6,6 +6,7 @@ import '../../models/models.dart';
 import '../../providers/entity_providers.dart';
 import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/format.dart';
 import '../../utils/utils_widgets.dart';
 import '../appointments/booking_screen.dart';
 import '../../utils/image_url.dart';
@@ -299,7 +300,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                                 ),
                               ),
                               Text(
-                                '\$${s.price.toStringAsFixed(0)}',
+                                formatMoney(s.price, _salon!.currency, decimals: 0),
                                 style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 15),
                               ),
                             ],

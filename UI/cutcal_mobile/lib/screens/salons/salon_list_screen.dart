@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/entity_providers.dart';
 import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/format.dart';
 import '../../utils/utils_widgets.dart';
 import 'salon_detail_screen.dart';
 import 'salon_filter_sheet.dart';
@@ -484,7 +485,7 @@ class _RecommendationCard extends StatelessWidget {
                       ),
                     ),
                     if (salon.minServicePrice != null)
-                      Text('from \$${salon.minServicePrice!.toStringAsFixed(0)}', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                      Text('from ${formatMoney(salon.minServicePrice!, salon.currency, decimals: 0)}', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
                   ],
                 ),
               ),
@@ -563,7 +564,7 @@ class _FeaturedSalonCard extends StatelessWidget {
                       ),
                     ),
                     if (salon.minServicePrice != null)
-                      Text('from \$${salon.minServicePrice!.toStringAsFixed(0)}', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                      Text('from ${formatMoney(salon.minServicePrice!, salon.currency, decimals: 0)}', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
                   ],
                 ),
               ),
@@ -687,7 +688,7 @@ class _SalonCard extends StatelessWidget {
                       ),
                       if (salon.minServicePrice != null)
                         Text(
-                          'from \$${salon.minServicePrice!.toStringAsFixed(0)}',
+                          'from ${formatMoney(salon.minServicePrice!, salon.currency, decimals: 0)}',
                           style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 14),
                         ),
                     ],

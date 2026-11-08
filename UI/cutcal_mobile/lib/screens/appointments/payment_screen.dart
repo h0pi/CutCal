@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../providers/entity_providers.dart';
 import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/format.dart';
 import '../../utils/utils_widgets.dart';
-import 'paypal_webview_screen.dart';
-import 'stripe_checkout_screen.dart';
 
+/// The last step of booking: nothing is paid here. The customer picks how they will pay, and the payment itself
+/// (with the tip, the tax and the total) happens once the salon has confirmed the appointment.
 class PaymentScreen extends StatefulWidget {
   final SalonModel salon;
   final SalonServiceModel service;
@@ -31,15 +31,15 @@ class PaymentScreen extends StatefulWidget {
 class _PaymentScreenState extends State<PaymentScreen> {
   bool _isProcessing = false;
 
-  Future<void> _payWithCash() async {
+  Future<void> _book({required String method, required String methodName}) async {
     final confirmed = await showConfirmationDialog(
       context,
       title: 'Confirm booking',
-      message: 'Book ${widget.service.name} with ${widget.staff.fullName ?? 'staff'} and pay \$${widget.service.price.toStringAsFixed(2)} in cash at the salon?',
-      confirmLabel: 'Book & pay at salon',
+      message: 'Book ${widget.service.name}? You will pay by $methodName after the salon confirms your appointment.',
+      confirmLabel: 'Book',
       isDestructive: false,
     );
-    if (!confirmed) return;
+    if (!confirmed || !mounted) return;
 
     setState(() => _isProcessing = true);
     try {
@@ -48,101 +48,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
         'staffId': widget.staff.id,
         'serviceId': widget.service.id,
         'scheduledAt': widget.scheduledAt.toIso8601String(),
-        'paymentMethod': 'Cash',
+        'paymentMethod': method,
       });
-      if (mounted) {
-        showSuccessSnackBar(context, 'Appointment booked for ${DateFormat('MMM d, y • HH:mm').format(widget.scheduledAt)}. Pay at the salon.');
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      }
-    } on ApiClientException catch (e) {
-      if (mounted) showErrorSnackBar(context, e.message);
-    } finally {
-      if (mounted) setState(() => _isProcessing = false);
-    }
-  }
-
-  Future<void> _payWithPayPal() async {
-    final confirmed = await showConfirmationDialog(
-      context,
-      title: 'Pay with PayPal',
-      message: 'Book ${widget.service.name} and pay \$${widget.service.price.toStringAsFixed(2)} now via PayPal sandbox?',
-      confirmLabel: 'Pay now',
-      isDestructive: false,
-    );
-    if (!confirmed) return;
-
-    setState(() => _isProcessing = true);
-    try {
-      final appointment = await context.read<AppointmentProvider>().insert({
-        'salonId': widget.salon.id,
-        'staffId': widget.staff.id,
-        'serviceId': widget.service.id,
-        'scheduledAt': widget.scheduledAt.toIso8601String(),
-        'paymentMethod': 'PayPal',
-      });
-
-      final paymentProvider = context.read<PaymentProvider>();
-      final order = await paymentProvider.createOrder(appointment.id);
-      final approvalUrl = order['approvalUrl'] as String?;
-      if (approvalUrl == null || approvalUrl.isEmpty) {
-        throw ApiClientException('PayPal did not return an approval link. Please try again.');
-      }
-
       if (!mounted) return;
-      final approvedToken = await Navigator.of(context).push<String?>(
-        MaterialPageRoute(builder: (_) => PayPalWebViewScreen(approvalUrl: approvalUrl)),
+      showSuccessSnackBar(
+        context,
+        'Appointment booked for ${formatDateTime(widget.scheduledAt, is24Hour: widget.salon.is24HourFormat)}. You can pay once the salon confirms it.',
       );
-
-      if (approvedToken == null) {
-        if (mounted) {
-          showErrorSnackBar(context, 'Payment was not completed. Your appointment is booked but still unpaid — try again from your bookings.');
-          Navigator.of(context).popUntil((route) => route.isFirst);
-        }
-        return;
-      }
-
-      await paymentProvider.captureOrder(order['orderId'] as String, appointment.id);
-
-      if (mounted) {
-        showSuccessSnackBar(context, 'Payment successful! Appointment booked for ${DateFormat('MMM d, y • HH:mm').format(widget.scheduledAt)}.');
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      }
-    } on ApiClientException catch (e) {
-      if (mounted) showErrorSnackBar(context, e.message);
-    } finally {
-      if (mounted) setState(() => _isProcessing = false);
-    }
-  }
-
-  Future<void> _payWithCard() async {
-    final confirmed = await showConfirmationDialog(
-      context,
-      title: 'Pay by card',
-      message: 'Book ${widget.service.name} and pay \$${widget.service.price.toStringAsFixed(2)} now by card?',
-      confirmLabel: 'Pay now',
-      isDestructive: false,
-    );
-    if (!confirmed) return;
-
-    setState(() => _isProcessing = true);
-    try {
-      final appointment = await context.read<AppointmentProvider>().insert({
-        'salonId': widget.salon.id,
-        'staffId': widget.staff.id,
-        'serviceId': widget.service.id,
-        'scheduledAt': widget.scheduledAt.toIso8601String(),
-        'paymentMethod': 'Stripe',
-      });
-
-      if (!mounted) return;
-      final paid = await payWithStripe(context, appointment.id);
-      if (!mounted) return;
-
-      if (paid) {
-        showSuccessSnackBar(context, 'Payment successful! Appointment booked for ${DateFormat('MMM d, y • HH:mm').format(widget.scheduledAt)}.');
-      } else {
-        showErrorSnackBar(context, 'Payment was not completed. Your appointment is booked but still unpaid — try again from your bookings.');
-      }
       Navigator.of(context).popUntil((route) => route.isFirst);
     } on ApiClientException catch (e) {
       if (mounted) showErrorSnackBar(context, e.message);
@@ -154,7 +66,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Payment')),
+      appBar: AppBar(title: const Text('Confirm booking')),
       body: _isProcessing
           ? const LoadingIndicator()
           : ListView(
@@ -169,7 +81,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       Text(widget.service.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary)),
                       const SizedBox(height: 4),
                       Text(
-                        '${widget.salon.name} · ${DateFormat('MMM d • HH:mm').format(widget.scheduledAt)} · ${widget.staff.fullName ?? ''}',
+                        '${widget.salon.name} · ${formatDateTime(widget.scheduledAt, is24Hour: widget.salon.is24HourFormat, datePattern: 'MMM d')} · ${widget.staff.fullName ?? ''}',
                         style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                       ),
                     ],
@@ -179,31 +91,31 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFEDEAF5))),
-                  child: Column(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _costRow('Subtotal', widget.service.price),
-                      const Divider(height: 20),
-                      _costRow('Total', widget.service.price, bold: true),
+                      const Text('Price', style: TextStyle(color: AppColors.textSecondary)),
+                      Text(
+                        formatMoney(widget.service.price, widget.salon.currency),
+                        style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 17),
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
-                const Text('Pay with', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary)),
-                const SizedBox(height: 12),
-                _paymentTile(
-                  badgeColor: const Color(0xFF16A34A),
-                  badgeLabel: '\$',
-                  title: 'Cash',
-                  subtitle: 'Pay in person at the salon',
-                  onTap: _payWithCash,
+                const SizedBox(height: 8),
+                const Text(
+                  'Tax and an optional tip are added when you pay.',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 24),
+                const Text('Pay later with', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary)),
+                const SizedBox(height: 12),
                 _paymentTile(
                   badgeColor: const Color(0xFFFFC439),
                   badgeLabel: 'P',
                   title: 'PayPal',
                   subtitle: 'Sandbox checkout · buyer protection',
-                  onTap: _payWithPayPal,
+                  onTap: () => _book(method: 'PayPal', methodName: 'PayPal'),
                 ),
                 const SizedBox(height: 10),
                 _paymentTile(
@@ -211,7 +123,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   badgeLabel: 'S',
                   title: 'Card',
                   subtitle: 'Secure checkout by Stripe',
-                  onTap: _payWithCard,
+                  onTap: () => _book(method: 'Stripe', methodName: 'card'),
                 ),
                 const SizedBox(height: 16),
                 const Text(
@@ -221,23 +133,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 ),
               ],
             ),
-    );
-  }
-
-  Widget _costRow(String label, double amount, {bool bold = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: TextStyle(color: bold ? AppColors.textPrimary : AppColors.textSecondary, fontWeight: bold ? FontWeight.bold : FontWeight.normal)),
-        Text(
-          '\$${amount.toStringAsFixed(2)}',
-          style: TextStyle(
-            color: bold ? AppColors.primary : AppColors.textPrimary,
-            fontWeight: FontWeight.bold,
-            fontSize: bold ? 17 : 14,
-          ),
-        ),
-      ],
     );
   }
 

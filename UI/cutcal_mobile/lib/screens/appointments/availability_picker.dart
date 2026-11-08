@@ -6,6 +6,7 @@ import '../../models/models.dart';
 import '../../providers/entity_providers.dart';
 import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/format.dart';
 import '../../utils/utils_widgets.dart';
 
 /// Colour-coded month calendar plus a grid of free/taken start times for the chosen day.
@@ -15,6 +16,7 @@ class AvailabilityPicker extends StatefulWidget {
   final int serviceId;
   final int staffId;
   final int? excludeAppointmentId;
+  final bool is24HourFormat;
   final ValueChanged<DateTime?> onChanged;
 
   const AvailabilityPicker({
@@ -23,6 +25,7 @@ class AvailabilityPicker extends StatefulWidget {
     required this.serviceId,
     required this.staffId,
     this.excludeAppointmentId,
+    this.is24HourFormat = true,
     required this.onChanged,
   });
 
@@ -340,7 +343,7 @@ class _AvailabilityPickerState extends State<AvailabilityPicker> {
 
   Widget _buildSlotTile(AvailabilitySlotModel slot) {
     final selected = _selectedStart == slot.startsAt;
-    final label = DateFormat('HH:mm').format(slot.startsAt);
+    final label = formatTimeOfDay(slot.startsAt, is24Hour: widget.is24HourFormat);
 
     return GestureDetector(
       onTap: slot.isAvailable ? () => _selectSlot(slot) : null,

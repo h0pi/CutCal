@@ -8,6 +8,7 @@ import '../../models/models.dart';
 import '../../providers/entity_providers.dart';
 import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/format.dart';
 import '../../utils/utils_widgets.dart';
 import '../notifications/notifications_screen.dart';
 
@@ -24,6 +25,7 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
   List<AppointmentModel> _pendingAppointments = [];
   List<double> _dailyRevenue = List.filled(7, 0);
   double _weekRevenue = 0;
+  String? _currency;
   double? _revenueChangePct;
   bool _isLoading = true;
   String? _loadError;
@@ -94,6 +96,7 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
         _pendingAppointments = pending.toList();
         _dailyRevenue = dailyRevenue;
         _weekRevenue = weekRevenue;
+        _currency = thisWeekReport['appointmentsReport']?['currency'] as String?;
         _revenueChangePct = changePct;
         _isLoading = false;
       });
@@ -258,7 +261,7 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
                   children: [
                     const Text('Revenue this week', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
                     const SizedBox(height: 4),
-                    Text('\$${_weekRevenue.toStringAsFixed(2)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                    Text(formatMoney(_weekRevenue, _currency), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
                   ],
                 ),
               ),
@@ -337,7 +340,7 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
         children: [
           Text('${a.customerName ?? 'Customer'} • ${a.serviceName ?? ''}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
           const SizedBox(height: 2),
-          Text(DateFormat('MMM d, y • HH:mm').format(a.scheduledAt), style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+          Text(formatDateTime(a.scheduledAt, is24Hour: a.is24HourFormat), style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -378,7 +381,7 @@ class _ManagerDashboardScreenState extends State<ManagerDashboardScreen> {
       ),
       child: Row(
         children: [
-          Text(DateFormat('HH:mm').format(a.scheduledAt), style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+          Text(formatTimeOfDay(a.scheduledAt, is24Hour: a.is24HourFormat), style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

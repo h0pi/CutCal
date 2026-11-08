@@ -122,6 +122,9 @@ class SalonModel {
   final bool isFeatured;
   final double? distanceKm;
   final double? minServicePrice;
+  final String currency;
+  final bool is24HourFormat;
+  final String timeZone;
   final List<SalonWorkingHoursModel> workingHours;
 
   SalonModel({
@@ -144,6 +147,9 @@ class SalonModel {
     this.isFeatured = false,
     this.distanceKm,
     this.minServicePrice,
+    this.currency = 'USD',
+    this.is24HourFormat = true,
+    this.timeZone = 'UTC',
     this.workingHours = const [],
   });
 
@@ -167,6 +173,9 @@ class SalonModel {
         isFeatured: json['isFeatured'] ?? false,
         distanceKm: json['distanceKm'] == null ? null : (json['distanceKm']).toDouble(),
         minServicePrice: json['minServicePrice'] == null ? null : (json['minServicePrice']).toDouble(),
+        currency: json['currency'] ?? 'USD',
+        is24HourFormat: json['is24HourFormat'] ?? true,
+        timeZone: json['timeZone'] ?? 'UTC',
         workingHours: (json['workingHours'] as List? ?? [])
             .map((e) => SalonWorkingHoursModel.fromJson(e))
             .toList(),
@@ -252,12 +261,19 @@ class AppointmentModel {
   final DateTime scheduledAt;
   final int durationMinutes;
   final double price;
+  final String currency;
+  final bool is24HourFormat;
+  final String timeZone;
   final String stateName;
   final String paymentMethod;
   final String paymentStatus;
   final bool isPaid;
   final String? cancellationReason;
   final bool hasReview;
+
+  /// The customer can pay once the salon has confirmed the appointment (and still after the visit if it was left unpaid).
+  bool get canBePaid =>
+      (paymentMethod == 'PayPal' || paymentMethod == 'Stripe') && paymentStatus == 'Unpaid' && (stateName == 'Confirmed' || stateName == 'Completed');
 
   AppointmentModel({
     required this.id,
@@ -272,6 +288,9 @@ class AppointmentModel {
     required this.scheduledAt,
     required this.durationMinutes,
     required this.price,
+    this.currency = 'USD',
+    this.is24HourFormat = true,
+    this.timeZone = 'UTC',
     required this.stateName,
     required this.paymentMethod,
     required this.paymentStatus,
@@ -293,13 +312,27 @@ class AppointmentModel {
         scheduledAt: DateTime.parse(json['scheduledAt']),
         durationMinutes: json['durationMinutes'] ?? 30,
         price: (json['price'] ?? 0).toDouble(),
+        currency: json['currency'] ?? 'USD',
+        is24HourFormat: json['is24HourFormat'] ?? true,
+        timeZone: json['timeZone'] ?? 'UTC',
         stateName: json['stateName'] ?? 'Pending',
-        paymentMethod: json['paymentMethod'] ?? 'Cash',
+        paymentMethod: json['paymentMethod'] ?? 'PayPal',
         paymentStatus: json['paymentStatus'] ?? 'Unpaid',
         isPaid: json['isPaid'] ?? false,
         cancellationReason: json['cancellationReason'],
         hasReview: json['hasReview'] ?? false,
       );
+}
+
+/// What the customer chose to tip: a percentage of the price or an amount. The server works out the tax and the total.
+class TipChoice {
+  final double? percent;
+  final double? amount;
+
+  const TipChoice.percent(double this.percent) : amount = null;
+  const TipChoice.amount(double this.amount) : percent = null;
+
+  Map<String, dynamic> toJson() => {'tipPercent': percent, 'tipAmount': amount};
 }
 
 class AvailabilityDayModel {

@@ -5,6 +5,7 @@ import '../../models/models.dart';
 import '../../providers/entity_providers.dart';
 import '../../utils/api_client_exception.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/format.dart';
 import '../../utils/utils_widgets.dart';
 
 class ManagerServicesScreen extends StatefulWidget {
@@ -16,6 +17,8 @@ class ManagerServicesScreen extends StatefulWidget {
 
 class _ManagerServicesScreenState extends State<ManagerServicesScreen> {
   List<SalonModel> _salons = [];
+
+  String _currencyOf(int salonId) => _salons.where((x) => x.id == salonId).firstOrNull?.currency ?? 'USD';
   List<SalonServiceModel> _services = [];
   bool _isLoading = true;
   String? _loadError;
@@ -212,7 +215,7 @@ class _ManagerServicesScreenState extends State<ManagerServicesScreen> {
                               Expanded(
                                 child: Text(s.name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
                               ),
-                              Text('\$${s.price.toStringAsFixed(2)}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                              Text(formatMoney(s.price, _currencyOf(s.salonId)), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.primary)),
                             ],
                           ),
                           if (s.description != null && s.description!.isNotEmpty) ...[
