@@ -5,6 +5,9 @@ import '../models/models.dart';
 import '../providers/entity_providers.dart';
 import '../utils/utils_widgets.dart';
 
+// Only currencies that both PayPal and Stripe can charge, because customers pay in the currency of the salon.
+const _currencies = ['USD', 'EUR'];
+
 const _dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 class SettingsScreen extends StatefulWidget {
@@ -42,7 +45,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _selectedSalon = salon;
       _autoConfirm = salon.autoConfirm;
-      _currency = salon.currency;
+      _currency = _currencies.contains(salon.currency) ? salon.currency : _currencies.first;
       _is24HourFormat = salon.is24HourFormat;
       _timeZone = salon.timeZone;
       _hours = List.generate(7, (i) {
@@ -70,17 +73,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _save() async {
     if (_selectedSalon == null) return;
     final salon = _selectedSalon!;
-    await context.read<SalonProvider>().update(salon.id, {
-      'name': salon.name,
-      'salonCategoryId': salon.salonCategoryId,
-      'description': salon.description,
-      'address': salon.address,
-      'cityId': salon.cityId,
-      'latitude': salon.latitude,
-      'longitude': salon.longitude,
-      'phone': salon.phone,
-      'email': salon.email,
-      'profileImageUrl': salon.profileImageUrl,
+    await context.read<SalonProvider>().updateSettings(salon.id, {
       'autoConfirm': _autoConfirm,
       'currency': _currency,
       'is24HourFormat': _is24HourFormat,
@@ -143,11 +136,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           DropdownButtonFormField<String>(
             initialValue: _currency,
             decoration: const InputDecoration(labelText: 'Currency'),
-            items: const [
-              DropdownMenuItem(value: 'USD', child: Text('USD')),
-              DropdownMenuItem(value: 'EUR', child: Text('EUR')),
-              DropdownMenuItem(value: 'BAM', child: Text('BAM')),
-            ],
+            items: [for (final currency in _currencies) DropdownMenuItem(value: currency, child: Text(currency))],
             onChanged: (v) => setState(() => _currency = v ?? 'USD'),
           ),
           const SizedBox(height: 16),

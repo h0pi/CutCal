@@ -129,9 +129,13 @@ class _CitiesScreenState extends State<CitiesScreen> {
   Future<void> _delete(CityModel city) async {
     final confirmed = await showConfirmationDialog(context, title: 'Delete city', message: 'Delete "${city.name}"?');
     if (!confirmed) return;
-    await context.read<CityProvider>().remove(city.id);
-    if (mounted) showSuccessSnackBar(context, 'City deleted.');
-    _load();
+    try {
+      await context.read<CityProvider>().remove(city.id);
+      if (mounted) showSuccessSnackBar(context, 'City deleted.');
+      _load();
+    } on ApiClientException catch (e) {
+      if (mounted) showErrorSnackBar(context, e.message);
+    }
   }
 
   @override

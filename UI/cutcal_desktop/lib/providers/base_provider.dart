@@ -79,6 +79,15 @@ abstract class BaseProvider<T> with ChangeNotifier {
     throw ApiClientException(_extractMessage(response), statusCode: response.statusCode);
   }
 
+  /// The bytes of a downloaded PDF; anything else (an error from the server, a JSON body) throws instead of being saved as a file.
+  List<int> validatePdfResponse(http.Response response) {
+    final isPdf = response.statusCode == 200 && (response.headers['content-type'] ?? '').startsWith('application/pdf');
+    if (isPdf) return response.bodyBytes;
+
+    validateResponse(response);
+    throw ApiClientException('The server did not return a PDF report.');
+  }
+
   String _extractMessage(http.Response response) {
     try {
       final json = jsonDecode(response.body);

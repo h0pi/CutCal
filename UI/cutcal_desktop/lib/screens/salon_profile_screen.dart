@@ -210,8 +210,6 @@ class _SalonProfileScreenState extends State<SalonProfileScreen> {
       'phone': _phoneController.text,
       'email': _emailController.text,
       'profileImageUrl': salon.profileImageUrl,
-      'autoConfirm': salon.autoConfirm,
-      'workingHours': const [],
     });
     if (mounted) showSuccessSnackBar(context, 'Salon profile updated.');
   }

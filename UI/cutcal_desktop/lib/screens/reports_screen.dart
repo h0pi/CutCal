@@ -7,6 +7,8 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../providers/entity_providers.dart';
+import '../utils/api_client_exception.dart';
+import '../utils/format.dart';
 import '../utils/utils_widgets.dart';
 
 class ReportsScreen extends StatefulWidget {
@@ -59,15 +61,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
       switch (preset) {
         case 'Today':
           _dateFrom = today;
-          _dateTo = today.add(const Duration(days: 1)).subtract(const Duration(milliseconds: 1));
+          _dateTo = today;
           break;
         case 'Week':
           _dateFrom = today.subtract(Duration(days: today.weekday - 1));
-          _dateTo = now;
+          _dateTo = today;
           break;
         case 'Month':
           _dateFrom = DateTime(now.year, now.month, 1);
-          _dateTo = now;
+          _dateTo = today;
           break;
       }
     });
@@ -75,18 +77,25 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Future<void> _downloadAppointmentsPdf() async {
-    final bytes = await context.read<ReportProvider>().downloadAppointmentsPdf(salonId: _salonId, dateFrom: _dateFrom, dateTo: _dateTo);
-    await _saveAndNotify(bytes, 'appointments-report.pdf');
+    try {
+      final bytes = await context.read<ReportProvider>().downloadAppointmentsPdf(salonId: _salonId, dateFrom: _dateFrom, dateTo: _dateTo);
+      await _saveAndNotify(bytes, 'appointments-report.pdf');
+    } on ApiClientException catch (e) {
+      if (mounted) showErrorSnackBar(context, e.message);
+    }
   }
 
   Future<void> _downloadServicesPdf() async {
-    final bytes = await context.read<ReportProvider>().downloadServicesPdf(salonId: _salonId);
-    await _saveAndNotify(bytes, 'services-report.pdf');
+    try {
+      final bytes = await context.read<ReportProvider>().downloadServicesPdf(salonId: _salonId, dateFrom: _dateFrom, dateTo: _dateTo);
+      await _saveAndNotify(bytes, 'services-report.pdf');
+    } on ApiClientException catch (e) {
+      if (mounted) showErrorSnackBar(context, e.message);
+    }
   }
 
   Future<void> _saveAndNotify(List<int> bytes, String fileName) async {
-    // TODO: use the `printing` package to also offer a direct print dialog;
-    // for now the report is saved to disk and can be opened/printed manually.
+    // The report is saved to disk and can be opened and printed from there.
     final dir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
     final file = File('${dir.path}${Platform.pathSeparator}$fileName');
     await file.writeAsBytes(bytes);
@@ -142,7 +151,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
           if (_isLoading)
             const LoadingIndicator()
           else ...[
-            // TODO: render an actual bar/line chart (e.g. fl_chart) instead of this placeholder summary.
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -157,7 +165,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       'Completed: ${appointmentsReport?['completedCount'] ?? '-'}  •  '
                       'Cancelled: ${appointmentsReport?['cancelledCount'] ?? '-'}',
                     ),
-                    Text('Total revenue: \$${appointmentsReport?['totalRevenue'] ?? 0}'),
+                    Text('Total revenue: ${formatMoney((appointmentsReport?['totalRevenue'] as num?) ?? 0, appointmentsReport?['currency'] as String?)}'),
                     Text('Average duration: ${(appointmentsReport?['averageDurationMinutes'] as num?)?.toStringAsFixed(0) ?? '-'} min'),
                     Text('Busiest day: ${appointmentsReport?['busiestDayOfWeek'] ?? '-'}'),
                     Text('Most popular service: ${servicesReport?['mostPopularService'] ?? '-'}'),

@@ -3,25 +3,24 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/models.dart';
+import '../utils/period.dart';
 import 'auth_provider.dart';
 import 'base_provider.dart';
 
-class ReportProvider {
-  Map<String, String> _headers() {
-    final headers = <String, String>{'Content-Type': 'application/json'};
-    if (AuthProvider.accessToken != null) {
-      headers['Authorization'] = 'Bearer ${AuthProvider.accessToken}';
-    }
-    return headers;
-  }
+class ReportProvider extends BaseProvider<Map<String, dynamic>> {
+  @override
+  String getEndpoint() => 'Reports';
+
+  @override
+  Map<String, dynamic> fromJson(json) => Map<String, dynamic>.from(json);
 
   Future<Map<String, dynamic>> getSummary({int? salonId, DateTime? dateFrom, DateTime? dateTo}) async {
     final params = <String, String>{};
     if (salonId != null) params['salonId'] = salonId.toString();
     if (dateFrom != null) params['dateFrom'] = dateFrom.toIso8601String();
-    if (dateTo != null) params['dateTo'] = dateTo.toIso8601String();
+    if (dateTo != null) params['dateTo'] = endOfPeriodParam(dateTo);
     final uri = Uri.parse('${AuthProvider.baseUrl}Reports').replace(queryParameters: params);
-    final response = await http.get(uri, headers: _headers());
+    final response = await http.get(uri, headers: createHeaders());
     return jsonDecode(response.body);
   }
 
@@ -29,20 +28,20 @@ class ReportProvider {
     final params = <String, String>{};
     if (salonId != null) params['salonId'] = salonId.toString();
     if (dateFrom != null) params['dateFrom'] = dateFrom.toIso8601String();
-    if (dateTo != null) params['dateTo'] = dateTo.toIso8601String();
+    if (dateTo != null) params['dateTo'] = endOfPeriodParam(dateTo);
     final uri = Uri.parse('${AuthProvider.baseUrl}Reports/Pdf/Appointments').replace(queryParameters: params);
-    final response = await http.get(uri, headers: _headers());
-    return response.bodyBytes;
+    final response = await http.get(uri, headers: createHeaders());
+    return validatePdfResponse(response);
   }
 
-  Future<List<int>> downloadServicesPdf({int? salonId, int? month, int? year}) async {
+  Future<List<int>> downloadServicesPdf({int? salonId, DateTime? dateFrom, DateTime? dateTo}) async {
     final params = <String, String>{};
     if (salonId != null) params['salonId'] = salonId.toString();
-    if (month != null) params['month'] = month.toString();
-    if (year != null) params['year'] = year.toString();
+    if (dateFrom != null) params['dateFrom'] = dateFrom.toIso8601String();
+    if (dateTo != null) params['dateTo'] = endOfPeriodParam(dateTo);
     final uri = Uri.parse('${AuthProvider.baseUrl}Reports/Pdf/Services').replace(queryParameters: params);
-    final response = await http.get(uri, headers: _headers());
-    return response.bodyBytes;
+    final response = await http.get(uri, headers: createHeaders());
+    return validatePdfResponse(response);
   }
 }
 
@@ -76,6 +75,13 @@ class SalonProvider extends BaseProvider<SalonModel> {
 
   @override
   SalonModel fromJson(json) => SalonModel.fromJson(json);
+
+  /// Saves only the settings that are given; the profile is saved apart (see [update]) so neither can undo the other.
+  Future<void> updateSettings(int salonId, Map<String, dynamic> settings) async {
+    final uri = Uri.parse('${AuthProvider.baseUrl}Salons/$salonId/Settings');
+    final response = await sendRequest(http.put(uri, headers: createHeaders(), body: jsonEncode(settings)));
+    validateResponse(response);
+  }
 
   Future<List<SalonGalleryModel>> getGallery(int salonId) async {
     final uri = Uri.parse('${AuthProvider.baseUrl}Salons/$salonId/Gallery');

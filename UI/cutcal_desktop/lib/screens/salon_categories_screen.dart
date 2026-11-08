@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../providers/entity_providers.dart';
+import '../utils/api_client_exception.dart';
 import '../utils/utils_widgets.dart';
 
 class SalonCategoriesScreen extends StatefulWidget {
@@ -62,9 +63,13 @@ class _SalonCategoriesScreenState extends State<SalonCategoriesScreen> {
   Future<void> _delete(SalonCategoryModel category) async {
     final confirmed = await showConfirmationDialog(context, title: 'Delete category', message: 'Delete "${category.name}"?');
     if (!confirmed) return;
-    await context.read<SalonCategoryProvider>().remove(category.id);
-    if (mounted) showSuccessSnackBar(context, 'Category deleted.');
-    _load();
+    try {
+      await context.read<SalonCategoryProvider>().remove(category.id);
+      if (mounted) showSuccessSnackBar(context, 'Category deleted.');
+      _load();
+    } on ApiClientException catch (e) {
+      if (mounted) showErrorSnackBar(context, e.message);
+    }
   }
 
   @override

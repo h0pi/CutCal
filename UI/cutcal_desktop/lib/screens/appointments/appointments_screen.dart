@@ -8,6 +8,8 @@ import '../../models/models.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/entity_providers.dart';
 import '../../utils/api_client_exception.dart';
+import '../../utils/format.dart';
+import '../../utils/period.dart';
 import '../../utils/utils_widgets.dart';
 
 class AppointmentsScreen extends StatefulWidget {
@@ -50,19 +52,15 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     final result = await context.read<AppointmentProvider>().get(filter: {
       'page': _page,
       'pageSize': _pageSize,
+      'customerName': _customerNameController.text.trim(),
       'status': _status,
       'paymentStatus': _paymentStatus,
       'dateFrom': _dateFrom?.toIso8601String(),
-      'dateTo': _dateTo?.toIso8601String(),
+      'dateTo': _dateTo == null ? null : endOfPeriodParam(_dateTo!),
     });
-    var items = result.items;
-    if (_customerNameController.text.isNotEmpty) {
-      final query = _customerNameController.text.toLowerCase();
-      items = items.where((a) => (a.customerName ?? '').toLowerCase().contains(query)).toList();
-    }
     if (!mounted) return;
     setState(() {
-      _appointments = items;
+      _appointments = result.items;
       _totalCount = result.totalCount;
       _isLoading = false;
     });
@@ -162,7 +160,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
           children: [
             _detailRow('Method', a.paymentMethod),
             _detailRow('Status', a.paymentStatus),
-            _detailRow('Amount', '\$${a.price.toStringAsFixed(2)}'),
+            _detailRow('Price', formatMoney(a.price, a.currency)),
+            _detailRow('Time zone', a.timeZone),
             if (a.paypalOrderId != null) _detailRow('PayPal order ID', a.paypalOrderId!),
             if (a.paypalCaptureId != null) _detailRow('PayPal capture ID', a.paypalCaptureId!),
             if (a.paymentMethod == 'PayPal' && a.paypalOrderId == null)
@@ -209,7 +208,10 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                 child: TextField(
                   controller: _customerNameController,
                   decoration: const InputDecoration(labelText: 'Customer name', border: OutlineInputBorder(), isDense: true),
-                  onSubmitted: (_) => _load(),
+                  onSubmitted: (_) {
+                    _page = 0;
+                    _load();
+                  },
                 ),
               ),
               SizedBox(
@@ -283,9 +285,9 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                                 DataCell(Text(a.salonName ?? '')),
                                 DataCell(Text(a.serviceName ?? '')),
                                 DataCell(Text(a.staffName ?? '—')),
-                                DataCell(Text(DateFormat('MMM d, HH:mm').format(a.scheduledAt))),
+                                DataCell(Text(formatDateTime(a.scheduledAt, is24Hour: a.is24HourFormat, datePattern: 'MMM d'))),
                                 DataCell(StatusBadge(status: a.stateName)),
-                                DataCell(Text('\$${a.price.toStringAsFixed(2)}')),
+                                DataCell(Text(formatMoney(a.price, a.currency))),
                                 DataCell(
                                   InkWell(
                                     onTap: () => _showPaymentDetails(a),

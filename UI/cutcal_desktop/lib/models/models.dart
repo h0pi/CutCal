@@ -290,6 +290,9 @@ class AppointmentModel {
   final DateTime scheduledAt;
   final int durationMinutes;
   final double price;
+  final String currency;
+  final bool is24HourFormat;
+  final String timeZone;
   final String stateName;
   final String paymentMethod;
   final String paymentStatus;
@@ -312,6 +315,9 @@ class AppointmentModel {
     required this.scheduledAt,
     required this.durationMinutes,
     required this.price,
+    this.currency = 'USD',
+    this.is24HourFormat = true,
+    this.timeZone = 'UTC',
     required this.stateName,
     required this.paymentMethod,
     required this.paymentStatus,
@@ -335,8 +341,11 @@ class AppointmentModel {
         scheduledAt: DateTime.parse(json['scheduledAt']),
         durationMinutes: json['durationMinutes'] ?? 30,
         price: (json['price'] ?? 0).toDouble(),
+        currency: json['currency'] ?? 'USD',
+        is24HourFormat: json['is24HourFormat'] ?? true,
+        timeZone: json['timeZone'] ?? 'UTC',
         stateName: json['stateName'] ?? 'Pending',
-        paymentMethod: json['paymentMethod'] ?? 'Cash',
+        paymentMethod: json['paymentMethod'] ?? 'PayPal',
         paymentStatus: json['paymentStatus'] ?? 'Unpaid',
         isPaid: json['isPaid'] ?? false,
         paypalOrderId: json['paypalOrderId'],

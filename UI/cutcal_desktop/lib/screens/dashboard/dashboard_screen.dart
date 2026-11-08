@@ -1,11 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../providers/entity_providers.dart';
+import '../../utils/format.dart';
 import '../../utils/utils_widgets.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -97,7 +97,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) return const LoadingIndicator();
 
-    final revenueToday = _todayAppointments.where((a) => a.paymentStatus == 'Paid').fold<double>(0, (sum, a) => sum + a.price);
+    final paidToday = _todayAppointments.where((a) => a.paymentStatus == 'Paid').toList();
+    final revenueToday = paidToday.fold<double>(0, (sum, a) => sum + a.price);
+    // Salons may charge in different currencies, which cannot be added up; then only the number is shown.
+    final currencies = paidToday.map((a) => a.currency).toSet();
+    final revenueCurrency = currencies.length == 1 ? currencies.first : (paidToday.isEmpty ? 'USD' : null);
     final newCustomers = _todayAppointments.map((a) => a.customerId).toSet().length;
 
     return ListView(
@@ -108,7 +112,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           runSpacing: 16,
           children: [
             _kpiCard('Appointments today', _todayAppointments.length.toString(), Icons.event),
-            _kpiCard('Revenue today', '\$${revenueToday.toStringAsFixed(2)}', Icons.attach_money),
+            _kpiCard('Revenue today', formatMoney(revenueToday, revenueCurrency), Icons.attach_money),
             _kpiCard('Customers today', newCustomers.toString(), Icons.person),
             _kpiCard('Pending requests', _pending.length.toString(), Icons.hourglass_top),
           ],
@@ -122,7 +126,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ..._pending.map((a) => Card(
                 child: ListTile(
                   title: Text('${a.salonName ?? ''} • ${a.serviceName ?? ''}'),
-                  subtitle: Text(DateFormat('MMM d, y • HH:mm').format(a.scheduledAt)),
+                  subtitle: Text(formatDateTime(a.scheduledAt, is24Hour: a.is24HourFormat)),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [

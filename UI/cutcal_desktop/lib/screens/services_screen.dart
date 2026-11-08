@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../providers/entity_providers.dart';
+import '../utils/api_client_exception.dart';
+import '../utils/format.dart';
 import '../utils/utils_widgets.dart';
 
 class ServicesScreen extends StatefulWidget {
@@ -195,9 +197,13 @@ class _ServicesScreenState extends State<ServicesScreen> {
       message: 'Delete "${service.name}"? This cannot be undone.',
     );
     if (!confirmed) return;
-    await context.read<SalonServiceProvider>().remove(service.id);
-    if (mounted) showSuccessSnackBar(context, 'Service deleted.');
-    _load();
+    try {
+      await context.read<SalonServiceProvider>().remove(service.id);
+      if (mounted) showSuccessSnackBar(context, 'Service deleted.');
+      _load();
+    } on ApiClientException catch (e) {
+      if (mounted) showErrorSnackBar(context, e.message);
+    }
   }
 
   @override
@@ -256,7 +262,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                           .map((s) => DataRow(cells: [
                                 DataCell(Text(s.name)),
                                 DataCell(Text('${s.durationMinutes} min')),
-                                DataCell(Text('\$${s.price.toStringAsFixed(2)}')),
+                                DataCell(Text(formatMoney(s.price, _salons.where((x) => x.id == s.salonId).firstOrNull?.currency ?? 'USD'))),
                                 DataCell(Icon(s.isActive ? Icons.check_circle : Icons.cancel, color: s.isActive ? Colors.green : Colors.grey)),
                                 DataCell(Row(children: [
                                   IconButton(icon: const Icon(Icons.edit), onPressed: () => _openForm(service: s)),
