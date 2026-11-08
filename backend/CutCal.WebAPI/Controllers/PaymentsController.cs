@@ -19,10 +19,16 @@ public class PaymentsController : ControllerBase
         _service = service;
     }
 
-    [HttpPost("CreateOrder")]
-    public async Task<ActionResult<CreateOrderResponse>> CreateOrder([FromBody] CreateOrderRequest request)
+    [HttpGet("Quote")]
+    public async Task<ActionResult<PaymentQuoteResponse>> Quote([FromQuery] PaymentQuoteRequest request)
     {
-        return Ok(await _service.CreateOrderAsync(request.AppointmentId));
+        return Ok(await _service.GetQuoteAsync(request));
+    }
+
+    [HttpPost("CreateOrder")]
+    public async Task<ActionResult<CreateOrderResponse>> CreateOrder([FromBody] PaymentQuoteRequest request)
+    {
+        return Ok(await _service.CreateOrderAsync(request));
     }
 
     [HttpPost("CaptureOrder")]
@@ -32,9 +38,9 @@ public class PaymentsController : ControllerBase
     }
 
     [HttpPost("CreateStripeSession")]
-    public async Task<ActionResult<CreateCheckoutSessionResponse>> CreateStripeSession([FromBody] StripePaymentRequest request)
+    public async Task<ActionResult<CreateCheckoutSessionResponse>> CreateStripeSession([FromBody] PaymentQuoteRequest request)
     {
-        return Ok(await _service.CreateStripeSessionAsync(request.AppointmentId));
+        return Ok(await _service.CreateStripeSessionAsync(request));
     }
 
     [HttpPost("ConfirmStripePayment")]

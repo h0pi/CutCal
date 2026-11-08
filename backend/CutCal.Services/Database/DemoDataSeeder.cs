@@ -80,7 +80,7 @@ public static class DemoDataSeeder
                     DurationMinutes = service.DurationMinutes,
                     Price = service.Price,
                     StateName = confirmed ? AppointmentStateNames.Confirmed : AppointmentStateNames.Pending,
-                    PaymentMethod = k % 2 == 0 ? PaymentMethodNames.Cash : PaymentMethodNames.PayPal,
+                    PaymentMethod = k % 2 == 0 ? PaymentMethodNames.Stripe : PaymentMethodNames.PayPal,
                     PaymentStatus = PaymentStatusNames.Unpaid,
                     ApprovedById = confirmed ? salon.OwnerId : null,
                     ApprovedAt = confirmed ? now : null,

@@ -87,6 +87,10 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
         {
             query = query.Where(x => x.CustomerId == search.CustomerId.Value);
         }
+        if (!string.IsNullOrWhiteSpace(search.CustomerName))
+        {
+            query = query.Where(x => (x.Customer.FirstName + " " + x.Customer.LastName).Contains(search.CustomerName));
+        }
         if (search.SalonId.HasValue)
         {
             query = query.Where(x => x.SalonId == search.SalonId.Value);
@@ -103,15 +107,7 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
         {
             query = query.Where(x => x.PaymentStatus == search.PaymentStatus);
         }
-        if (search.DateFrom.HasValue)
-        {
-            query = query.Where(x => x.ScheduledAt >= search.DateFrom.Value);
-        }
-        if (search.DateTo.HasValue)
-        {
-            query = query.Where(x => x.ScheduledAt <= search.DateTo.Value);
-        }
-        return query.OrderByDescending(x => x.ScheduledAt);
+        return query.InPeriod(search.DateFrom, search.DateTo).OrderByDescending(x => x.ScheduledAt);
     }
 
     public static BaseAppointmentState GetState(string stateName) => stateName switch
@@ -127,9 +123,9 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
     /// Appointment times are the salon's wall-clock time and are compared with UTC, so a slot that is
     /// less than the salon's UTC offset in the past is not caught here; everything earlier is.
     /// </summary>
-    private static void EnsureNotInPast(DateTime scheduledAt)
+    private static void EnsureNotInPast(Salon salon, DateTime scheduledAt)
     {
-        if (scheduledAt < DateTime.UtcNow)
+        if (scheduledAt < SalonClock.Now(salon))
         {
             throw new ClientException("An appointment cannot be scheduled in the past.");
         }
@@ -148,14 +144,15 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
             throw new ClientException("Salon is closed on the selected day.");
         }
 
-        var requestedTime = TimeOnly.FromDateTime(scheduledAt);
-        var endTime = TimeOnly.FromDateTime(scheduledAt.AddMinutes(durationMinutes));
-        if (requestedTime < workingHours.OpenTime.Value || endTime > workingHours.CloseTime.Value)
+        // Whole date-times, not times of day: an appointment that runs past midnight must not wrap around to the start of the day.
+        var endsAt = scheduledAt.AddMinutes(durationMinutes);
+        var opensAt = scheduledAt.Date + workingHours.OpenTime.Value.ToTimeSpan();
+        var closesAt = scheduledAt.Date + workingHours.CloseTime.Value.ToTimeSpan();
+        if (scheduledAt < opensAt || endsAt > closesAt)
         {
             throw new ClientException("Selected time is outside of salon working hours.");
         }
 
-        var endsAt = scheduledAt.AddMinutes(durationMinutes);
         var excludedId = excludeAppointmentId ?? 0;
         var overlapping = await Context.Appointments.AnyAsync(a =>
             a.StaffId == staffId &&
@@ -191,14 +188,13 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
 
     public async Task<AppointmentResponse> InsertAsync(AppointmentInsertRequest request, int customerId)
     {
-        EnsureNotInPast(request.ScheduledAt);
-
         var salon = await Context.Salons.Include(x => x.WorkingHours).FirstOrDefaultAsync(x => x.Id == request.SalonId)
             ?? throw new ClientException("Salon not found.");
-        var service = await Context.SalonServices.FirstOrDefaultAsync(x => x.Id == request.ServiceId && x.SalonId == request.SalonId)
+        EnsureNotInPast(salon, request.ScheduledAt);
+        var service = await Context.SalonServices.Bookable(request.SalonId).FirstOrDefaultAsync(x => x.Id == request.ServiceId)
             ?? throw new ClientException("Service not found for this salon.");
-        var staff = await Context.Staff.FirstOrDefaultAsync(x => x.Id == request.StaffId && x.SalonId == request.SalonId)
-            ?? throw new ClientException("Staff member not found for this salon.");
+        var staff = await Context.Staff.Bookable(request.SalonId, request.ServiceId).FirstOrDefaultAsync(x => x.Id == request.StaffId)
+            ?? throw new ClientException("Selected staff member is not available for this service.");
         var customer = await Context.Users.FirstOrDefaultAsync(x => x.Id == customerId)
             ?? throw new ClientException("Customer not found.");
 
@@ -242,6 +238,7 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
     public async Task<AppointmentResponse> ConfirmAsync(int id, int managerId)
     {
         var appointment = await LoadForChangeAsync(id);
+        await OwnershipGuard.EnsureCanActOnAppointmentAsync(Context, appointment, _userAccessor, allowCustomer: false);
         GetState(appointment.StateName).Confirm(appointment, managerId);
 
         _notificationService.Add(appointment.CustomerId, "Appointment confirmed",
@@ -261,6 +258,7 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
         }
 
         var appointment = await LoadForChangeAsync(id);
+        await OwnershipGuard.EnsureCanActOnAppointmentAsync(Context, appointment, _userAccessor, allowCustomer: true);
         var wasPaid = appointment.PaymentStatus == PaymentStatusNames.Paid;
         GetState(appointment.StateName).Cancel(appointment, reason, userId);
 
@@ -272,7 +270,7 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
         {
             try
             {
-                await _paymentService.RefundAsync(id);
+                await _paymentService.RefundCancelledAppointmentAsync(id);
             }
             catch (Exception ex)
             {
@@ -290,6 +288,7 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
     public async Task<AppointmentResponse> CompleteAsync(int id)
     {
         var appointment = await LoadForChangeAsync(id);
+        await OwnershipGuard.EnsureCanActOnAppointmentAsync(Context, appointment, _userAccessor, allowCustomer: false);
         GetState(appointment.StateName).Complete(appointment);
 
         _notificationService.Add(appointment.CustomerId, "Appointment completed",
@@ -302,9 +301,8 @@ public class AppointmentService : BaseReadService<Appointment, AppointmentRespon
 
     public async Task<AppointmentResponse> RescheduleAsync(int id, DateTime newScheduledAt, int customerId)
     {
-        EnsureNotInPast(newScheduledAt);
-
         var appointment = await LoadForChangeAsync(id);
+        EnsureNotInPast(appointment.Salon, newScheduledAt);
         if (appointment.CustomerId != customerId)
         {
             throw new ClientException("You can only reschedule your own appointments.");

@@ -96,11 +96,16 @@ public class SalonUpdateRequest
     public string? Phone { get; set; }
     public string? Email { get; set; }
     public string? ProfileImageUrl { get; set; }
-    public bool AutoConfirm { get; set; }
-    public string Currency { get; set; } = "USD";
-    public bool Is24HourFormat { get; set; } = true;
-    public string TimeZone { get; set; } = "UTC";
-    public List<SalonWorkingHoursUpsertRequest> WorkingHours { get; set; } = new();
+}
+
+/// <summary>The settings of a salon, saved apart from its profile. A value that is not sent is left as it is.</summary>
+public class SalonSettingsRequest
+{
+    public bool? AutoConfirm { get; set; }
+    public string? Currency { get; set; }
+    public bool? Is24HourFormat { get; set; }
+    public string? TimeZone { get; set; }
+    public List<SalonWorkingHoursUpsertRequest>? WorkingHours { get; set; }
 }
 
 public class SalonFeatureRequest
@@ -220,9 +225,15 @@ public class ReviewReplyRequest
     public string Reply { get; set; } = null!;
 }
 
-public class CreateOrderRequest
+/// <summary>
+/// What the customer chooses before paying: the appointment and a tip, as a percentage of the price or as an amount (the amount wins
+/// when both are sent). The server works out the tax and the total itself.
+/// </summary>
+public class PaymentQuoteRequest
 {
     public int AppointmentId { get; set; }
+    public decimal? TipPercent { get; set; }
+    public decimal? TipAmount { get; set; }
 }
 
 public class CaptureOrderRequest

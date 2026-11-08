@@ -1,6 +1,7 @@
 using CutCal.Messaging;
 using CutCal.Model.Constants;
 using CutCal.Model.Exceptions;
+using CutCal.Model.Requests;
 using CutCal.Services.Database;
 using CutCal.Services.Services;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +13,9 @@ public class StripePaymentServiceTests : IDisposable
 {
     private const int AppointmentId = 1;
     private const decimal Price = 45.50m;
-    private const long PriceInCents = 4550;
+    private const decimal Tax = 7.74m; // 17% of the price
+    private const decimal Total = Price + Tax;
+    private const long TotalInCents = 5324;
     private const string AuthenticSignature = "signed-by-stripe";
 
     private sealed class FakeStripeGateway : IStripeGateway
@@ -31,6 +34,15 @@ public class StripePaymentServiceTests : IDisposable
         }
 
         public Task<StripeCheckoutSession> GetCheckoutSessionAsync(string sessionId) => Task.FromResult(_sessions[sessionId]);
+
+        public List<string> Expired { get; } = new();
+
+        public Task ExpireCheckoutSessionAsync(string sessionId)
+        {
+            Expired.Add(sessionId);
+            Change(sessionId, x => x with { Status = "expired" });
+            return Task.CompletedTask;
+        }
 
         public StripeCheckoutSession Session(string sessionId) => _sessions[sessionId];
 
@@ -89,24 +101,27 @@ public class StripePaymentServiceTests : IDisposable
 
     private PaymentService CustomerService() => ServiceFor(_customerId, RoleNames.Customer);
 
-    private async Task<string> StartPaymentAsync() => (await CustomerService().CreateStripeSessionAsync(AppointmentId)).SessionId;
+    private static PaymentQuoteRequest Quote(decimal? tipPercent = null, decimal? tipAmount = null) =>
+        new() { AppointmentId = AppointmentId, TipPercent = tipPercent, TipAmount = tipAmount };
+
+    private async Task<string> StartPaymentAsync() => (await CustomerService().CreateStripeSessionAsync(Quote())).SessionId;
 
     private Appointment Appointment => _context.Appointments.Include(x => x.Payment).Single(x => x.Id == AppointmentId);
 
     [Fact]
     public async Task Prices_the_session_from_the_appointment_and_remembers_it()
     {
-        var response = await CustomerService().CreateStripeSessionAsync(AppointmentId);
+        var response = await CustomerService().CreateStripeSessionAsync(Quote());
 
         var request = Assert.Single(_stripe.Created);
-        Assert.Equal(PriceInCents, request.AmountInMinorUnits);
+        Assert.Equal(TotalInCents, request.AmountInMinorUnits);
         Assert.Equal("usd", request.Currency);
         Assert.Equal(AppointmentId, request.AppointmentId);
         Assert.Equal("https://checkout.stripe.test/1", response.CheckoutUrl);
         var payment = Appointment.Payment!;
         Assert.Equal(response.SessionId, payment.StripeSessionId);
         Assert.Equal(PaymentStatusNames.Created, payment.Status);
-        Assert.Equal(Price, payment.Amount);
+        Assert.Equal(Total, payment.Amount);
         Assert.Equal("USD", payment.Currency);
     }
 
@@ -185,10 +200,10 @@ public class StripePaymentServiceTests : IDisposable
     [Fact]
     public async Task Only_the_customer_or_an_admin_can_start_a_payment()
     {
-        await Assert.ThrowsAsync<ClientException>(() => ServiceFor(_customerId + 1, RoleNames.Customer).CreateStripeSessionAsync(AppointmentId));
+        await Assert.ThrowsAsync<ClientException>(() => ServiceFor(_customerId + 1, RoleNames.Customer).CreateStripeSessionAsync(Quote()));
         Assert.Empty(_stripe.Created);
 
-        await ServiceFor(_customerId + 1, RoleNames.Admin).CreateStripeSessionAsync(AppointmentId);
+        await ServiceFor(_customerId + 1, RoleNames.Admin).CreateStripeSessionAsync(Quote());
         Assert.Single(_stripe.Created);
     }
 
@@ -207,7 +222,7 @@ public class StripePaymentServiceTests : IDisposable
         Assert.Single(_context.Notifications.Where(x => x.UserId == _customerId && x.Type == nameof(CutCal.Model.Enums.NotificationType.PaymentReceived)));
         var message = Assert.Single(_publisher.Sent);
         Assert.Equal(NotificationMessageTypes.PaymentReceived, message.Type);
-        Assert.Equal(Price, message.Amount);
+        Assert.Equal(Total, message.Amount);
     }
 
     [Fact]
@@ -412,12 +427,12 @@ public class StripePaymentServiceTests : IDisposable
         var response = await AdminService().RefundAsync(AppointmentId);
 
         var refund = Assert.Single(_stripe.Refunds);
-        Assert.Equal(("pi_test_1", PriceInCents), refund);
+        Assert.Equal(("pi_test_1", TotalInCents), refund);
         Assert.Equal(PaymentStatusNames.Refunded, response.Status);
         Assert.Equal(PaymentStatusNames.Refunded, Appointment.PaymentStatus);
         var message = Assert.Single(_publisher.Sent);
         Assert.Equal(NotificationMessageTypes.PaymentRefunded, message.Type);
-        Assert.Equal(Price, message.Amount);
+        Assert.Equal(Total, message.Amount);
         Assert.Single(_context.Notifications.Where(x => x.UserId == _customerId && x.Type == nameof(CutCal.Model.Enums.NotificationType.PaymentRefunded)));
     }
 
@@ -454,5 +469,168 @@ public class StripePaymentServiceTests : IDisposable
         await Assert.ThrowsAsync<ClientException>(() => AdminService().RefundAsync(AppointmentId));
 
         Assert.Empty(_stripe.Refunds);
+    }
+
+    [Fact]
+    public async Task A_manager_cannot_refund_a_payment_of_another_salon()
+    {
+        await PayAsync();
+        var salon = _context.Salons.Single(x => x.Id == Appointment.SalonId);
+        var otherManagerId = _context.Salons.First(x => x.OwnerId != salon.OwnerId).OwnerId;
+
+        await Assert.ThrowsAsync<ClientException>(() => ServiceFor(otherManagerId, RoleNames.SalonManager).RefundAsync(AppointmentId));
+
+        Assert.Empty(_stripe.Refunds);
+        Assert.Equal(PaymentStatusNames.Paid, Appointment.Payment!.Status);
+    }
+
+    [Fact]
+    public async Task A_manager_refunds_a_payment_of_their_own_salon()
+    {
+        await PayAsync();
+        var salon = _context.Salons.Single(x => x.Id == Appointment.SalonId);
+
+        await ServiceFor(salon.OwnerId, RoleNames.SalonManager).RefundAsync(AppointmentId);
+
+        Assert.Single(_stripe.Refunds);
+    }
+
+    [Fact]
+    public async Task The_refund_after_a_cancellation_does_not_need_a_manager()
+    {
+        await PayAsync();
+
+        await CustomerService().RefundCancelledAppointmentAsync(AppointmentId);
+
+        Assert.Single(_stripe.Refunds);
+    }
+
+    [Fact]
+    public async Task A_paypal_order_is_refused_for_an_appointment_booked_with_another_method()
+    {
+        var error = await Assert.ThrowsAsync<ClientException>(() => CustomerService().CreateOrderAsync(Quote()));
+
+        Assert.Equal("This appointment is not set to be paid with PayPal.", error.Message);
+        Assert.Null(Appointment.Payment);
+    }
+
+    [Fact]
+    public async Task A_paypal_order_is_refused_for_a_cancelled_appointment()
+    {
+        var appointment = _context.Appointments.Single(x => x.Id == AppointmentId);
+        appointment.PaymentMethod = PaymentMethodNames.PayPal;
+        appointment.StateName = AppointmentStateNames.Cancelled;
+        await _context.SaveChangesAsync();
+
+        var error = await Assert.ThrowsAsync<ClientException>(() => CustomerService().CreateOrderAsync(Quote()));
+
+        Assert.Equal("A cancelled appointment cannot be paid.", error.Message);
+    }
+
+    [Fact]
+    public async Task A_paypal_capture_is_refused_for_a_cancelled_appointment_or_another_method()
+    {
+        await Assert.ThrowsAsync<ClientException>(() => CustomerService().CaptureOrderAsync("order", AppointmentId));
+
+        var appointment = _context.Appointments.Single(x => x.Id == AppointmentId);
+        appointment.PaymentMethod = PaymentMethodNames.PayPal;
+        appointment.StateName = AppointmentStateNames.Cancelled;
+        await _context.SaveChangesAsync();
+
+        var error = await Assert.ThrowsAsync<ClientException>(() => CustomerService().CaptureOrderAsync("order", AppointmentId));
+
+        Assert.Equal("A cancelled appointment cannot be paid.", error.Message);
+    }
+
+    [Fact]
+    public async Task The_server_adds_tax_and_the_chosen_tip_to_the_price()
+    {
+        var byPercent = await CustomerService().GetQuoteAsync(Quote(tipPercent: 10));
+        var byAmount = await CustomerService().GetQuoteAsync(Quote(tipAmount: 5m));
+        var noTip = await CustomerService().GetQuoteAsync(Quote());
+
+        Assert.Equal((Price, Tax, 4.55m, Price + Tax + 4.55m, "USD"), (byPercent.Subtotal, byPercent.Tax, byPercent.Tip, byPercent.Total, byPercent.Currency));
+        Assert.Equal(Price + Tax + 5m, byAmount.Total);
+        Assert.Equal((0m, Total), (noTip.Tip, noTip.Total));
+    }
+
+    [Fact]
+    public async Task A_tip_that_is_negative_or_more_than_the_price_is_refused()
+    {
+        await Assert.ThrowsAsync<ClientException>(() => CustomerService().GetQuoteAsync(Quote(tipAmount: -1m)));
+        await Assert.ThrowsAsync<ClientException>(() => CustomerService().GetQuoteAsync(Quote(tipPercent: -5)));
+        await Assert.ThrowsAsync<ClientException>(() => CustomerService().GetQuoteAsync(Quote(tipPercent: 101)));
+        await Assert.ThrowsAsync<ClientException>(() => CustomerService().CreateStripeSessionAsync(Quote(tipAmount: Price + 1)));
+        Assert.Empty(_stripe.Created);
+    }
+
+    [Fact]
+    public async Task The_card_is_charged_the_total_and_the_tax_and_tip_are_stored()
+    {
+        var response = await CustomerService().CreateStripeSessionAsync(Quote(tipPercent: 10));
+
+        var request = Assert.Single(_stripe.Created);
+        Assert.Equal(5779, request.AmountInMinorUnits);
+        var payment = Appointment.Payment!;
+        Assert.Equal((Price + Tax + 4.55m, Tax, 4.55m), (payment.Amount, payment.TaxAmount, payment.TipAmount));
+        Assert.Equal(response.SessionId, payment.StripeSessionId);
+    }
+
+    [Fact]
+    public async Task Asking_again_with_the_same_tip_reuses_the_open_page_and_another_tip_replaces_it()
+    {
+        var first = (await CustomerService().CreateStripeSessionAsync(Quote(tipPercent: 10))).SessionId;
+        var same = (await CustomerService().CreateStripeSessionAsync(Quote(tipPercent: 10))).SessionId;
+        var other = (await CustomerService().CreateStripeSessionAsync(Quote(tipPercent: 20))).SessionId;
+
+        Assert.Equal(first, same);
+        Assert.NotEqual(first, other);
+        Assert.Equal(first, Assert.Single(_stripe.Expired));
+        Assert.Equal(other, Appointment.Payment!.StripeSessionId);
+        Assert.Equal(Price + Tax + 9.10m, Appointment.Payment.Amount);
+    }
+
+    [Fact]
+    public async Task The_payment_is_taken_in_the_currency_of_the_salon()
+    {
+        _context.Salons.Single(x => x.Id == Appointment.SalonId).Currency = "EUR";
+        await _context.SaveChangesAsync();
+
+        await CustomerService().CreateStripeSessionAsync(Quote());
+
+        Assert.Equal("eur", Assert.Single(_stripe.Created).Currency);
+        Assert.Equal("EUR", Appointment.Payment!.Currency);
+
+        _stripe.Pay("cs_test_1");
+        await CustomerService().ConfirmStripePaymentAsync(AppointmentId);
+
+        Assert.Equal(PaymentStatusNames.Paid, Appointment.PaymentStatus);
+    }
+
+    [Fact]
+    public async Task An_appointment_the_salon_has_not_confirmed_yet_cannot_be_paid()
+    {
+        _context.Appointments.Single(x => x.Id == AppointmentId).StateName = AppointmentStateNames.Pending;
+        await _context.SaveChangesAsync();
+
+        var stripe = await Assert.ThrowsAsync<ClientException>(() => CustomerService().CreateStripeSessionAsync(Quote()));
+        _context.Appointments.Single(x => x.Id == AppointmentId).PaymentMethod = PaymentMethodNames.PayPal;
+        await _context.SaveChangesAsync();
+        var paypal = await Assert.ThrowsAsync<ClientException>(() => CustomerService().CreateOrderAsync(Quote()));
+
+        Assert.Equal("The appointment can be paid only after the salon has confirmed it.", stripe.Message);
+        Assert.Equal(stripe.Message, paypal.Message);
+        Assert.Empty(_stripe.Created);
+    }
+
+    [Fact]
+    public async Task A_completed_appointment_that_is_still_unpaid_can_be_paid()
+    {
+        _context.Appointments.Single(x => x.Id == AppointmentId).StateName = AppointmentStateNames.Completed;
+        await _context.SaveChangesAsync();
+
+        await CustomerService().CreateStripeSessionAsync(Quote());
+
+        Assert.Single(_stripe.Created);
     }
 }

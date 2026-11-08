@@ -22,7 +22,7 @@ public class ReportsController : ControllerBase
     public async Task<ActionResult<object>> Get([FromQuery] int? salonId, [FromQuery] DateTime? dateFrom, [FromQuery] DateTime? dateTo)
     {
         AppointmentsReportResponse appointmentsReport = await _service.GetAppointmentsReportAsync(salonId, dateFrom, dateTo);
-        ServicesReportResponse servicesReport = await _service.GetServicesReportAsync(salonId, null, null);
+        ServicesReportResponse servicesReport = await _service.GetServicesReportAsync(salonId, dateFrom, dateTo);
         return Ok(new { appointmentsReport, servicesReport });
     }
 
@@ -34,9 +34,9 @@ public class ReportsController : ControllerBase
     }
 
     [HttpGet("Pdf/Services")]
-    public async Task<IActionResult> ServicesPdf([FromQuery] int? salonId, [FromQuery] int? month, [FromQuery] int? year)
+    public async Task<IActionResult> ServicesPdf([FromQuery] int? salonId, [FromQuery] DateTime? dateFrom, [FromQuery] DateTime? dateTo)
     {
-        var pdf = await _service.GenerateServicesPdfAsync(salonId, month, year);
+        var pdf = await _service.GenerateServicesPdfAsync(salonId, dateFrom, dateTo);
         return File(pdf, "application/pdf", "services-report.pdf");
     }
 }

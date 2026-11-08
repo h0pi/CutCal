@@ -8,8 +8,8 @@ namespace CutCal.Services.Services;
 
 public interface IAvailabilityService
 {
-    Task<List<AvailabilityDayResponse>> GetDaysAsync(int salonId, int serviceId, int? staffId, DateTime from, int days, DateTime? nowLocal);
-    Task<List<AvailabilitySlotResponse>> GetSlotsAsync(int salonId, int serviceId, int? staffId, DateTime date, int? excludeAppointmentId, DateTime? nowLocal);
+    Task<List<AvailabilityDayResponse>> GetDaysAsync(int salonId, int serviceId, int? staffId, DateTime from, int days);
+    Task<List<AvailabilitySlotResponse>> GetSlotsAsync(int salonId, int serviceId, int? staffId, DateTime date, int? excludeAppointmentId);
 }
 
 public class AvailabilityService : IAvailabilityService
@@ -34,7 +34,7 @@ public class AvailabilityService : IAvailabilityService
         List<Booking> Bookings,
         DateTime Now);
 
-    public async Task<List<AvailabilityDayResponse>> GetDaysAsync(int salonId, int serviceId, int? staffId, DateTime from, int days, DateTime? nowLocal)
+    public async Task<List<AvailabilityDayResponse>> GetDaysAsync(int salonId, int serviceId, int? staffId, DateTime from, int days)
     {
         if (days < 1 || days > MaxDaysRange)
         {
@@ -42,7 +42,7 @@ public class AvailabilityService : IAvailabilityService
         }
 
         var firstDay = from.Date;
-        var ctx = await LoadContextAsync(salonId, serviceId, staffId, firstDay, firstDay.AddDays(days), null, nowLocal);
+        var ctx = await LoadContextAsync(salonId, serviceId, staffId, firstDay, firstDay.AddDays(days), null);
 
         var result = new List<AvailabilityDayResponse>(days);
         for (var i = 0; i < days; i++)
@@ -64,28 +64,26 @@ public class AvailabilityService : IAvailabilityService
         return result;
     }
 
-    public async Task<List<AvailabilitySlotResponse>> GetSlotsAsync(int salonId, int serviceId, int? staffId, DateTime date, int? excludeAppointmentId, DateTime? nowLocal)
+    public async Task<List<AvailabilitySlotResponse>> GetSlotsAsync(int salonId, int serviceId, int? staffId, DateTime date, int? excludeAppointmentId)
     {
         var day = date.Date;
-        var ctx = await LoadContextAsync(salonId, serviceId, staffId, day, day.AddDays(1), excludeAppointmentId, nowLocal);
+        var ctx = await LoadContextAsync(salonId, serviceId, staffId, day, day.AddDays(1), excludeAppointmentId);
         return BuildSlots(ctx, day);
     }
 
-    private async Task<AvailabilityContext> LoadContextAsync(int salonId, int serviceId, int? staffId, DateTime rangeStart, DateTime rangeEnd, int? excludeAppointmentId, DateTime? nowLocal)
+    private async Task<AvailabilityContext> LoadContextAsync(int salonId, int serviceId, int? staffId, DateTime rangeStart, DateTime rangeEnd, int? excludeAppointmentId)
     {
         var salon = await _context.Salons.AsNoTracking()
             .Include(x => x.WorkingHours)
             .FirstOrDefaultAsync(x => x.Id == salonId)
             ?? throw new ClientException("Salon not found.");
 
-        var service = await _context.SalonServices.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == serviceId && x.SalonId == salonId && x.IsActive)
+        var service = await _context.SalonServices.AsNoTracking().Bookable(salonId)
+            .FirstOrDefaultAsync(x => x.Id == serviceId)
             ?? throw new ClientException("Service not found for this salon.");
 
-        var staffIds = await _context.Staff.AsNoTracking()
-            .Where(x => x.SalonId == salonId && x.IsActive
-                && (staffId == null || x.Id == staffId)
-                && x.StaffServices.Any(ss => ss.ServiceId == serviceId))
+        var staffIds = await _context.Staff.AsNoTracking().Bookable(salonId, serviceId)
+            .Where(x => staffId == null || x.Id == staffId)
             .Select(x => x.Id)
             .ToListAsync();
 
@@ -111,7 +109,7 @@ public class AvailabilityService : IAvailabilityService
             service.DurationMinutes,
             staffIds,
             bookings.Select(b => new Booking(b.StaffId, b.ScheduledAt, b.ScheduledAt.AddMinutes(b.DurationMinutes))).ToList(),
-            nowLocal ?? DateTime.UtcNow);
+            SalonClock.Now(salon));
     }
 
     private static List<AvailabilitySlotResponse> BuildSlots(AvailabilityContext ctx, DateTime date)

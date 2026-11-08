@@ -128,7 +128,7 @@ public static class RecommenderDemoDataSeeder
             DurationMinutes = service.DurationMinutes,
             Price = service.Price,
             StateName = AppointmentStateNames.Completed,
-            PaymentMethod = PaymentMethodNames.Cash,
+            PaymentMethod = PaymentMethodNames.PayPal,
             PaymentStatus = PaymentStatusNames.Paid,
             ApprovedById = bookable.Salon.OwnerId,
             ApprovedAt = day.AddDays(-1),

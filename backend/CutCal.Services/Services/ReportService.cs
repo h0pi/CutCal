@@ -13,9 +13,9 @@ namespace CutCal.Services.Services;
 public interface IReportService
 {
     Task<AppointmentsReportResponse> GetAppointmentsReportAsync(int? salonId, DateTime? dateFrom, DateTime? dateTo);
-    Task<ServicesReportResponse> GetServicesReportAsync(int? salonId, int? month, int? year);
+    Task<ServicesReportResponse> GetServicesReportAsync(int? salonId, DateTime? dateFrom, DateTime? dateTo);
     Task<byte[]> GenerateAppointmentsPdfAsync(int? salonId, DateTime? dateFrom, DateTime? dateTo);
-    Task<byte[]> GenerateServicesPdfAsync(int? salonId, int? month, int? year);
+    Task<byte[]> GenerateServicesPdfAsync(int? salonId, DateTime? dateFrom, DateTime? dateTo);
 }
 
 public class ReportService : IReportService
@@ -62,6 +62,17 @@ public class ReportService : IReportService
         return ownedSalonIds;
     }
 
+    /// <summary>The currency the salons covered by a report charge in, or null when they differ and the amounts cannot be added up.</summary>
+    private async Task<string?> CurrencyOfAsync(int[]? allowedSalonIds)
+    {
+        var currencies = await _context.Salons
+            .Where(x => allowedSalonIds == null || allowedSalonIds.Contains(x.Id))
+            .Select(x => x.Currency)
+            .Distinct()
+            .ToListAsync();
+        return currencies.Count == 1 ? currencies[0] : null;
+    }
+
     public async Task<AppointmentsReportResponse> GetAppointmentsReportAsync(int? salonId, DateTime? dateFrom, DateTime? dateTo)
     {
         var allowedSalonIds = await ResolveAllowedSalonIdsAsync(salonId);
@@ -74,8 +85,7 @@ public class ReportService : IReportService
             .AsQueryable();
 
         if (allowedSalonIds is not null) query = query.Where(x => allowedSalonIds.Contains(x.SalonId));
-        if (dateFrom.HasValue) query = query.Where(x => x.ScheduledAt >= dateFrom.Value);
-        if (dateTo.HasValue) query = query.Where(x => x.ScheduledAt <= dateTo.Value);
+        query = query.InPeriod(dateFrom, dateTo);
 
         var appointments = await query.OrderBy(x => x.ScheduledAt).ToListAsync();
 
@@ -93,6 +103,7 @@ public class ReportService : IReportService
             TotalRevenue = appointments.Where(x => x.PaymentStatus == PaymentStatusNames.Paid).Sum(x => x.Price),
             AverageDurationMinutes = appointments.Count > 0 ? appointments.Average(x => x.DurationMinutes) : 0,
             BusiestDayOfWeek = busiestDay?.ToString(),
+            Currency = await CurrencyOfAsync(allowedSalonIds),
             Appointments = appointments.Select(a => new AppointmentResponse
             {
                 Id = a.Id,
@@ -107,6 +118,9 @@ public class ReportService : IReportService
                 ScheduledAt = a.ScheduledAt,
                 DurationMinutes = a.DurationMinutes,
                 Price = a.Price,
+                Currency = a.Salon.Currency,
+                Is24HourFormat = a.Salon.Is24HourFormat,
+                TimeZone = a.Salon.TimeZone,
                 StateName = a.StateName,
                 PaymentMethod = a.PaymentMethod,
                 PaymentStatus = a.PaymentStatus,
@@ -115,14 +129,13 @@ public class ReportService : IReportService
         };
     }
 
-    public async Task<ServicesReportResponse> GetServicesReportAsync(int? salonId, int? month, int? year)
+    public async Task<ServicesReportResponse> GetServicesReportAsync(int? salonId, DateTime? dateFrom, DateTime? dateTo)
     {
         var allowedSalonIds = await ResolveAllowedSalonIdsAsync(salonId);
 
         var query = _context.Appointments.Include(x => x.Service).AsQueryable();
         if (allowedSalonIds is not null) query = query.Where(x => allowedSalonIds.Contains(x.SalonId));
-        if (month.HasValue) query = query.Where(x => x.ScheduledAt.Month == month.Value);
-        if (year.HasValue) query = query.Where(x => x.ScheduledAt.Year == year.Value);
+        query = query.InPeriod(dateFrom, dateTo);
 
         var appointments = await query.ToListAsync();
 
@@ -145,6 +158,7 @@ public class ReportService : IReportService
         {
             MostPopularService = grouped.FirstOrDefault()?.ServiceName,
             TotalRevenue = grouped.Sum(x => x.TotalRevenue),
+            Currency = await CurrencyOfAsync(allowedSalonIds),
             Services = grouped
         };
     }
@@ -162,7 +176,7 @@ public class ReportService : IReportService
                 page.Header().Text("CutCal - Appointments Report").FontSize(18).Bold();
                 page.Content().Column(column =>
                 {
-                    column.Item().Text($"Total: {report.TotalAppointments}  Confirmed: {report.ConfirmedCount}  Cancelled: {report.CancelledCount}  Completed: {report.CompletedCount}  Revenue: {report.TotalRevenue:C}");
+                    column.Item().Text($"Total: {report.TotalAppointments}  Confirmed: {report.ConfirmedCount}  Cancelled: {report.CancelledCount}  Completed: {report.CompletedCount}  Revenue: {report.TotalRevenue:F2} {report.Currency}");
                     column.Item().Text($"Avg. duration: {report.AverageDurationMinutes:F0} min  Busiest day: {report.BusiestDayOfWeek ?? "N/A"}");
                     column.Item().PaddingTop(10).Table(table =>
                     {
@@ -204,9 +218,9 @@ public class ReportService : IReportService
         return document.GeneratePdf();
     }
 
-    public async Task<byte[]> GenerateServicesPdfAsync(int? salonId, int? month, int? year)
+    public async Task<byte[]> GenerateServicesPdfAsync(int? salonId, DateTime? dateFrom, DateTime? dateTo)
     {
-        var report = await GetServicesReportAsync(salonId, month, year);
+        var report = await GetServicesReportAsync(salonId, dateFrom, dateTo);
 
         var document = Document.Create(container =>
         {
@@ -217,7 +231,7 @@ public class ReportService : IReportService
                 page.Header().Text("CutCal - Services & Revenue Report").FontSize(18).Bold();
                 page.Content().Column(column =>
                 {
-                    column.Item().Text($"Most popular: {report.MostPopularService ?? "N/A"}  Total revenue: {report.TotalRevenue:C}");
+                    column.Item().Text($"Most popular: {report.MostPopularService ?? "N/A"}  Total revenue: {report.TotalRevenue:F2} {report.Currency}");
                     column.Item().PaddingTop(10).Table(table =>
                     {
                         table.ColumnsDefinition(columns =>

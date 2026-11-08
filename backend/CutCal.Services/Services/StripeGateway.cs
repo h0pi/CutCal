@@ -36,6 +36,9 @@ public interface IStripeGateway
     Task<StripeCheckoutSession> CreateCheckoutSessionAsync(StripeCheckoutRequest request);
     Task<StripeCheckoutSession> GetCheckoutSessionAsync(string sessionId);
 
+    /// <summary>Closes a checkout page that is still open, so it can no longer be paid.</summary>
+    Task ExpireCheckoutSessionAsync(string sessionId);
+
     /// <summary>Refunds a card payment. Asking again for the same payment never refunds it twice (Stripe returns the first refund).</summary>
     Task RefundAsync(string paymentIntentId, long amountInMinorUnits);
 
@@ -92,6 +95,9 @@ public sealed class StripeGateway : IStripeGateway
 
     public Task<StripeCheckoutSession> GetCheckoutSessionAsync(string sessionId) =>
         CallAsync(() => new SessionService(Client).GetAsync(sessionId));
+
+    public async Task ExpireCheckoutSessionAsync(string sessionId) =>
+        await CallAsync(() => new SessionService(Client).ExpireAsync(sessionId));
 
     public async Task RefundAsync(string paymentIntentId, long amountInMinorUnits)
     {

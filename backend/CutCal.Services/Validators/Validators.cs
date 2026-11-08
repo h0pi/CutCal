@@ -166,9 +166,27 @@ public class SalonUpdateRequestValidator : AbstractValidator<SalonUpdateRequest>
         RuleFor(x => x.Phone).ValidPhone();
         RuleFor(x => x.Email).ValidOptionalEmail();
         RuleFor(x => x.ProfileImageUrl).MaximumLength(Rules.UrlMaxLength);
-        RuleFor(x => x.Currency).Must(c => c is "USD" or "EUR" or "BAM").WithMessage("Currency must be one of: USD, EUR, BAM.");
-        RuleFor(x => x.TimeZone).NotEmpty().WithMessage("Time zone is required.");
-        RuleForEach(x => x.WorkingHours).SetValidator(new SalonWorkingHoursUpsertRequestValidator());
+    }
+}
+
+public class PaymentQuoteRequestValidator : AbstractValidator<PaymentQuoteRequest>
+{
+    public PaymentQuoteRequestValidator()
+    {
+        RuleFor(x => x.AppointmentId).GreaterThan(0).WithMessage("Choose an appointment to pay for.");
+        RuleFor(x => x.TipPercent).InclusiveBetween(0, 100).When(x => x.TipPercent is not null).WithMessage("The tip must be between 0% and 100%.");
+        RuleFor(x => x.TipAmount).GreaterThanOrEqualTo(0).When(x => x.TipAmount is not null).WithMessage("The tip cannot be negative.");
+    }
+}
+
+public class SalonSettingsRequestValidator : AbstractValidator<SalonSettingsRequest>
+{
+    public SalonSettingsRequestValidator()
+    {
+        // Only currencies that both PayPal and Stripe can charge, because the salon's currency is the one its customers pay in.
+        RuleFor(x => x.Currency).Must(c => c is "USD" or "EUR").When(x => x.Currency is not null).WithMessage("Currency must be one of: USD, EUR.");
+        RuleFor(x => x.TimeZone).Must(id => TimeZoneInfo.TryFindSystemTimeZoneById(id!, out _)).When(x => x.TimeZone is not null).WithMessage("Unknown time zone.");
+        RuleForEach(x => x.WorkingHours).SetValidator(new SalonWorkingHoursUpsertRequestValidator()).When(x => x.WorkingHours is not null);
     }
 }
 
@@ -275,8 +293,9 @@ public class AppointmentInsertRequestValidator : AbstractValidator<AppointmentIn
         RuleFor(x => x.SalonId).GreaterThan(0).WithMessage("Choose a salon.");
         RuleFor(x => x.StaffId).GreaterThan(0).WithMessage("Choose a stylist.");
         RuleFor(x => x.ServiceId).GreaterThan(0).WithMessage("Choose a service.");
-        RuleFor(x => x.PaymentMethod).Must(x => x is PaymentMethodNames.Cash or PaymentMethodNames.PayPal or PaymentMethodNames.Stripe)
-            .WithMessage($"Payment method must be {PaymentMethodNames.Cash}, {PaymentMethodNames.PayPal} or {PaymentMethodNames.Stripe}.");
+        // Cash is not offered: nothing could ever record that it was paid, so the visit would stay unpaid and out of the revenue.
+        RuleFor(x => x.PaymentMethod).Must(x => x is PaymentMethodNames.PayPal or PaymentMethodNames.Stripe)
+            .WithMessage($"Payment method must be {PaymentMethodNames.PayPal} or {PaymentMethodNames.Stripe}.");
     }
 }
 

@@ -231,7 +231,11 @@ public class Payment
     public string? PaypalCaptureId { get; set; }
     public string? StripeSessionId { get; set; }
     public string? StripePaymentIntentId { get; set; }
+
+    /// <summary>The total the customer is charged: the service price plus <see cref="TaxAmount"/> plus <see cref="TipAmount"/>.</summary>
     public decimal Amount { get; set; }
+    public decimal TaxAmount { get; set; }
+    public decimal TipAmount { get; set; }
     public string Currency { get; set; } = "USD";
     public string Status { get; set; } = null!;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

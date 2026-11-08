@@ -128,6 +128,9 @@ public class AppointmentResponse
     public DateTime ScheduledAt { get; set; }
     public int DurationMinutes { get; set; }
     public decimal Price { get; set; }
+    public string Currency { get; set; } = null!;
+    public bool Is24HourFormat { get; set; }
+    public string TimeZone { get; set; } = null!;
     public string StateName { get; set; } = null!;
     public string PaymentMethod { get; set; } = null!;
     public string PaymentStatus { get; set; } = null!;
@@ -175,9 +178,22 @@ public class PaymentResponse
     public string? PaypalOrderId { get; set; }
     public string? PaypalCaptureId { get; set; }
     public decimal Amount { get; set; }
+    public decimal TaxAmount { get; set; }
+    public decimal TipAmount { get; set; }
     public string Currency { get; set; } = null!;
     public string Status { get; set; } = null!;
     public DateTime CreatedAt { get; set; }
+}
+
+/// <summary>What paying an appointment will cost, worked out by the server: <c>Total = Subtotal + Tax + Tip</c>.</summary>
+public class PaymentQuoteResponse
+{
+    public decimal Subtotal { get; set; }
+    public decimal TaxRate { get; set; }
+    public decimal Tax { get; set; }
+    public decimal Tip { get; set; }
+    public decimal Total { get; set; }
+    public string Currency { get; set; } = null!;
 }
 
 public class CreateOrderResponse
@@ -216,6 +232,9 @@ public class AppointmentsReportResponse
     public decimal TotalRevenue { get; set; }
     public double AverageDurationMinutes { get; set; }
     public string? BusiestDayOfWeek { get; set; }
+
+    /// <summary>The currency of the amounts, or null when the salons covered use different ones.</summary>
+    public string? Currency { get; set; }
     public List<AppointmentResponse> Appointments { get; set; } = new();
 }
 
@@ -231,6 +250,9 @@ public class ServicesReportResponse
 {
     public string? MostPopularService { get; set; }
     public decimal TotalRevenue { get; set; }
+
+    /// <summary>The currency of the amounts, or null when the salons covered use different ones.</summary>
+    public string? Currency { get; set; }
     public List<ServiceReportItem> Services { get; set; } = new();
 }
 

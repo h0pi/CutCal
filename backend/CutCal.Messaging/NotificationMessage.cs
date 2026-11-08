@@ -30,4 +30,5 @@ public class NotificationMessage
     public DateTime ScheduledAt { get; set; }
     public string? Reason { get; set; }
     public decimal? Amount { get; set; }
+    public string? Currency { get; set; }
 }

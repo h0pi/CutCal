@@ -25,6 +25,8 @@ public interface IAccessManager
 
 public class AccessManager : IAccessManager
 {
+    private const string DeactivatedMessage = "This account is deactivated.";
+
     private readonly CutCalDbContext _context;
     private readonly ICryptoService _crypto;
     private readonly string _secretKey;
@@ -54,7 +56,7 @@ public class AccessManager : IAccessManager
         }
         if (!user.IsActive)
         {
-            throw new ClientException("This account is deactivated.");
+            throw new ClientException(DeactivatedMessage);
         }
 
         return await BuildLoginResponseAsync(user);
@@ -69,6 +71,10 @@ public class AccessManager : IAccessManager
         if (token is null || token.ExpiresAt < DateTime.UtcNow)
         {
             throw new ClientException("Invalid or expired refresh token.");
+        }
+        if (!token.User.IsActive)
+        {
+            throw new ClientException(DeactivatedMessage);
         }
 
         _context.RefreshTokens.Remove(token);

@@ -1,3 +1,4 @@
+using CutCal.Model.Exceptions;
 using CutCal.Model.Requests;
 using CutCal.Model.Responses;
 using CutCal.Model.SearchObjects;
@@ -15,6 +16,15 @@ public class SalonCategoryService : BaseCRUDService<SalonCategory, SalonCategory
 {
     public SalonCategoryService(CutCalDbContext context) : base(context)
     {
+    }
+
+    protected override async Task BeforeDelete(SalonCategory entity)
+    {
+        var salons = await Context.Salons.CountAsync(x => x.SalonCategoryId == entity.Id);
+        if (salons > 0)
+        {
+            throw new ClientException($"The category cannot be deleted because {salons} salon(s) use it.");
+        }
     }
 
     protected override IQueryable<SalonCategory> AddFilter(IQueryable<SalonCategory> query, SalonCategorySearchObject search)
@@ -55,6 +65,15 @@ public class CityService : BaseCRUDService<City, CityResponse, CitySearchObject,
 {
     public CityService(CutCalDbContext context) : base(context)
     {
+    }
+
+    protected override async Task BeforeDelete(City entity)
+    {
+        var salons = await Context.Salons.CountAsync(x => x.CityId == entity.Id);
+        if (salons > 0)
+        {
+            throw new ClientException($"The city cannot be deleted because {salons} salon(s) are in it.");
+        }
     }
 
     protected override IQueryable<City> AddInclude(IQueryable<City> query)

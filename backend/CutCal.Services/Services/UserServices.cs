@@ -95,6 +95,17 @@ public class UserService : BaseCRUDService<User, UserResponse, UserSearchObject,
         return query.Where(x => x.Id == _userAccessor.UserId);
     }
 
+    /// <summary>Only an administrator may (de)activate an account; for everyone else IsActive in the request is ignored.</summary>
+    protected override void MapUpdateToEntity(User entity, UserUpdateRequest request)
+    {
+        var isActive = entity.IsActive;
+        base.MapUpdateToEntity(entity, request);
+        if (!_userAccessor.IsInRole(RoleNames.Admin))
+        {
+            entity.IsActive = isActive;
+        }
+    }
+
     protected override IQueryable<User> AddInclude(IQueryable<User> query)
     {
         return query.Include(x => x.UserRoles).ThenInclude(ur => ur.Role);

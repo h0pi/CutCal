@@ -16,6 +16,7 @@ public interface ISalonService : IBaseCRUDService<SalonResponse, SalonSearchObje
 {
     Task<SalonResponse> ApproveAsync(int id);
     Task<SalonResponse> SetFeaturedAsync(int id, bool featured);
+    Task<SalonResponse> UpdateSettingsAsync(int id, SalonSettingsRequest request);
     Task<List<SalonGalleryResponse>> GetGalleryAsync(int salonId);
     Task<SalonGalleryResponse> AddGalleryImageAsync(int salonId, SalonGalleryInsertRequest request);
     Task RemoveGalleryImageAsync(int salonId, int imageId);
@@ -202,15 +203,17 @@ public class SalonManagementService : BaseCRUDService<Salon, SalonResponse, Salo
         salon.OwnerId = _userAccessor.UserId;
         salon.CreatedAt = DateTime.UtcNow;
         salon.IsApproved = false;
-        salon.WorkingHours = request.WorkingHours.Select(wh => new SalonWorkingHours
-        {
-            DayOfWeek = wh.DayOfWeek,
-            OpenTime = wh.OpenTime,
-            CloseTime = wh.CloseTime,
-            IsClosed = wh.IsClosed
-        }).ToList();
+        salon.WorkingHours = ToWorkingHours(request.WorkingHours);
         return salon;
     }
+
+    private static List<SalonWorkingHours> ToWorkingHours(IEnumerable<SalonWorkingHoursUpsertRequest> hours) => hours.Select(wh => new SalonWorkingHours
+    {
+        DayOfWeek = wh.DayOfWeek,
+        OpenTime = wh.OpenTime,
+        CloseTime = wh.CloseTime,
+        IsClosed = wh.IsClosed
+    }).ToList();
 
     protected override Task BeforeUpdate(Salon entity, SalonUpdateRequest request)
         => OwnershipGuard.EnsureManagesSalonAsync(Context, entity.Id, _userAccessor);
@@ -230,23 +233,26 @@ public class SalonManagementService : BaseCRUDService<Salon, SalonResponse, Salo
         entity.Phone = request.Phone;
         entity.Email = request.Email;
         entity.ProfileImageUrl = request.ProfileImageUrl;
-        entity.AutoConfirm = request.AutoConfirm;
-        entity.Currency = request.Currency;
-        entity.Is24HourFormat = request.Is24HourFormat;
-        entity.TimeZone = request.TimeZone;
+    }
 
-        if (request.WorkingHours.Count > 0)
+    /// <summary>Saves only the settings that were sent, so changing the profile elsewhere cannot undo them and the other way round.</summary>
+    public async Task<SalonResponse> UpdateSettingsAsync(int id, SalonSettingsRequest request)
+    {
+        var salon = await GetEntityByIdAsync(id) ?? throw new ClientException("Salon not found.");
+        await OwnershipGuard.EnsureManagesSalonAsync(Context, salon.Id, _userAccessor);
+
+        salon.AutoConfirm = request.AutoConfirm ?? salon.AutoConfirm;
+        salon.Currency = request.Currency ?? salon.Currency;
+        salon.Is24HourFormat = request.Is24HourFormat ?? salon.Is24HourFormat;
+        salon.TimeZone = request.TimeZone ?? salon.TimeZone;
+        if (request.WorkingHours is { Count: > 0 })
         {
-            Context.SalonWorkingHours.RemoveRange(entity.WorkingHours);
-            entity.WorkingHours = request.WorkingHours.Select(wh => new SalonWorkingHours
-            {
-                SalonId = entity.Id,
-                DayOfWeek = wh.DayOfWeek,
-                OpenTime = wh.OpenTime,
-                CloseTime = wh.CloseTime,
-                IsClosed = wh.IsClosed
-            }).ToList();
+            Context.SalonWorkingHours.RemoveRange(salon.WorkingHours);
+            salon.WorkingHours = ToWorkingHours(request.WorkingHours);
         }
+
+        await Context.SaveChangesAsync();
+        return salon.Adapt<SalonResponse>();
     }
 
     public async Task LogCategorySearchAsync(int userId, int categoryId)

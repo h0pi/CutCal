@@ -2902,6 +2902,12 @@ namespace CutCal.Services.Database.Migrations
                     b.Property<string>("StripeSessionId")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("TipAmount")
+                        .HasColumnType("decimal(18,2)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AppointmentId")

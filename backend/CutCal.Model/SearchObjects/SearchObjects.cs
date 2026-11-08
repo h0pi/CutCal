@@ -50,6 +50,7 @@ public class StaffSearchObject : BaseSearchObject
 public class AppointmentSearchObject : BaseSearchObject
 {
     public int? CustomerId { get; set; }
+    public string? CustomerName { get; set; }
     public int? SalonId { get; set; }
     public int? StaffId { get; set; }
     public string? Status { get; set; }

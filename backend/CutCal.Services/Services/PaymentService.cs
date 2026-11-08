@@ -1,6 +1,7 @@
 using CutCal.Messaging;
 using CutCal.Model.Constants;
 using CutCal.Model.Exceptions;
+using CutCal.Model.Requests;
 using CutCal.Model.Responses;
 using CutCal.Services.Auth;
 using CutCal.Services.Database;
@@ -16,17 +17,20 @@ namespace CutCal.Services.Services;
 
 public interface IPaymentService
 {
-    Task<CreateOrderResponse> CreateOrderAsync(int appointmentId);
+    Task<PaymentQuoteResponse> GetQuoteAsync(PaymentQuoteRequest request);
+    Task<CreateOrderResponse> CreateOrderAsync(PaymentQuoteRequest request);
     Task<PaymentResponse> CaptureOrderAsync(string paypalOrderId, int appointmentId);
-    Task<CreateCheckoutSessionResponse> CreateStripeSessionAsync(int appointmentId);
+    Task<CreateCheckoutSessionResponse> CreateStripeSessionAsync(PaymentQuoteRequest request);
     Task<PaymentResponse> ConfirmStripePaymentAsync(int appointmentId);
     Task HandleStripeWebhookAsync(string payload, string signatureHeader);
     Task<PaymentResponse> RefundAsync(int appointmentId);
+    Task<PaymentResponse> RefundCancelledAppointmentAsync(int appointmentId);
 }
 
 public class PaymentService : IPaymentService
 {
-    private const string PaymentCurrency = "USD";
+    // Added on top of the price of the service (the tip is not taxed).
+    private const decimal TaxRate = 0.17m;
     private const int MinorUnitsPerCurrencyUnit = 100;
     private const string AlreadyPaidMessage = "This appointment has already been paid for.";
 
@@ -68,16 +72,24 @@ public class PaymentService : IPaymentService
         _client = new PayPalHttpClient(environment);
     }
 
-    public async Task<CreateOrderResponse> CreateOrderAsync(int appointmentId)
+    /// <summary>What paying the appointment will cost, worked out here so the customer sees exactly what will be charged.</summary>
+    public async Task<PaymentQuoteResponse> GetQuoteAsync(PaymentQuoteRequest request)
     {
-        var appointment = await _context.Appointments.Include(x => x.Payment).FirstOrDefaultAsync(x => x.Id == appointmentId)
-            ?? throw new ClientException("Appointment not found.");
-        OwnershipGuard.EnsureIsSelfOrAdmin(appointment.CustomerId, _userAccessor);
+        var appointment = await LoadAppointmentForPaymentAsync(request.AppointmentId);
+        return ToQuote(appointment, request);
+    }
+
+    public async Task<CreateOrderResponse> CreateOrderAsync(PaymentQuoteRequest quoteRequest)
+    {
+        var appointmentId = quoteRequest.AppointmentId;
+        var appointment = await LoadAppointmentForPaymentAsync(appointmentId);
 
         if (appointment.Payment is { Status: PaymentStatusNames.Paid })
         {
             throw new ClientException(AlreadyPaidMessage);
         }
+        EnsureCanBePaidWith(appointment, PaymentMethodNames.PayPal);
+        var quote = ToQuote(appointment, quoteRequest);
 
         var orderRequest = new OrderRequest
         {
@@ -88,8 +100,8 @@ public class PaymentService : IPaymentService
                 {
                     AmountWithBreakdown = new AmountWithBreakdown
                     {
-                        CurrencyCode = "USD",
-                        Value = appointment.Price.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                        CurrencyCode = quote.Currency,
+                        Value = quote.Total.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
                     },
                     ReferenceId = appointmentId.ToString()
                 }
@@ -118,8 +130,7 @@ public class PaymentService : IPaymentService
 
             var payment = appointment.Payment ?? new Payment { AppointmentId = appointmentId, CreatedAt = DateTime.UtcNow };
             payment.PaypalOrderId = result.Id;
-            payment.Amount = appointment.Price;
-            payment.Currency = "USD";
+            ApplyQuote(payment, quote);
             payment.Status = PaymentStatusNames.Created;
             if (appointment.Payment is null)
             {
@@ -147,8 +158,10 @@ public class PaymentService : IPaymentService
         {
             return MapPaymentResponse(appointment.Payment);
         }
+        EnsureCanBePaidWith(appointment, PaymentMethodNames.PayPal);
 
-        if (appointment.PaypalOrderId != paypalOrderId)
+        var payment = appointment.Payment;
+        if (payment is null || appointment.PaypalOrderId != paypalOrderId)
         {
             throw new ClientException("This PayPal order does not belong to this appointment.");
         }
@@ -162,16 +175,8 @@ public class PaymentService : IPaymentService
             var result = response.Result<Order>();
             var captureId = result.PurchaseUnits?.FirstOrDefault()?.Payments?.Captures?.FirstOrDefault()?.Id;
 
-            var payment = appointment.Payment ?? new Payment { AppointmentId = appointmentId, CreatedAt = DateTime.UtcNow };
-            payment.PaypalOrderId = paypalOrderId;
             payment.PaypalCaptureId = captureId;
-            payment.Amount = appointment.Price;
-            payment.Currency = "USD";
             payment.Status = PaymentStatusNames.Paid;
-            if (appointment.Payment is null)
-            {
-                _context.Payments.Add(payment);
-            }
 
             appointment.PaypalCaptureId = captureId;
             appointment.PaymentStatus = PaymentStatusNames.Paid;
@@ -191,21 +196,16 @@ public class PaymentService : IPaymentService
     /// Starts card payment for the appointment. The amount is the appointment's own price, never something the client sends.
     /// While a Stripe session for it is still open the same one is returned, so the same visit cannot be paid twice.
     /// </summary>
-    public async Task<CreateCheckoutSessionResponse> CreateStripeSessionAsync(int appointmentId)
+    public async Task<CreateCheckoutSessionResponse> CreateStripeSessionAsync(PaymentQuoteRequest request)
     {
+        var appointmentId = request.AppointmentId;
         var appointment = await LoadAppointmentForPaymentAsync(appointmentId);
         if (appointment.Payment is { Status: PaymentStatusNames.Paid })
         {
             throw new ClientException(AlreadyPaidMessage);
         }
-        if (appointment.PaymentMethod != PaymentMethodNames.Stripe)
-        {
-            throw new ClientException("This appointment is not set to be paid by card.");
-        }
-        if (appointment.StateName == AppointmentStateNames.Cancelled)
-        {
-            throw new ClientException("A cancelled appointment cannot be paid.");
-        }
+        EnsureCanBePaidWith(appointment, PaymentMethodNames.Stripe);
+        var quote = ToQuote(appointment, request);
 
         if (appointment.Payment?.StripeSessionId is { } existingSessionId)
         {
@@ -218,22 +218,27 @@ public class PaymentService : IPaymentService
             }
             if (existing.Status == StripeSessionStatuses.Open)
             {
-                return new CreateCheckoutSessionResponse { SessionId = existing.Id, CheckoutUrl = existing.Url! };
+                if (existing.AmountTotal == ToMinorUnits(quote.Total) && string.Equals(existing.Currency, quote.Currency, StringComparison.OrdinalIgnoreCase))
+                {
+                    return new CreateCheckoutSessionResponse { SessionId = existing.Id, CheckoutUrl = existing.Url! };
+                }
+
+                // The customer chose another tip: the old page must stop accepting money for an amount we no longer expect.
+                await _stripe.ExpireCheckoutSessionAsync(existing.Id);
             }
         }
 
         var session = await _stripe.CreateCheckoutSessionAsync(new StripeCheckoutRequest(
             appointmentId,
             $"{appointment.Service.Name} at {appointment.Salon.Name}",
-            ToMinorUnits(appointment.Price),
-            PaymentCurrency.ToLowerInvariant(),
+            ToMinorUnits(quote.Total),
+            quote.Currency.ToLowerInvariant(),
             StripeSuccessUrl,
             StripeCancelUrl));
 
         var payment = appointment.Payment ?? new Payment { AppointmentId = appointmentId, CreatedAt = DateTime.UtcNow };
         payment.StripeSessionId = session.Id;
-        payment.Amount = appointment.Price;
-        payment.Currency = PaymentCurrency;
+        ApplyQuote(payment, quote);
         payment.Status = PaymentStatusNames.Created;
         if (appointment.Payment is null)
         {
@@ -299,6 +304,56 @@ public class PaymentService : IPaymentService
         await RecordStripePaymentAsync(appointment, payment, session);
     }
 
+    /// <summary>The same rules for every payment provider: it must be the method the appointment was booked with, and the visit must not be cancelled.</summary>
+    private static void EnsureCanBePaidWith(Appointment appointment, string method)
+    {
+        if (appointment.PaymentMethod != method)
+        {
+            throw new ClientException($"This appointment is not set to be paid with {method}.");
+        }
+        if (appointment.StateName == AppointmentStateNames.Cancelled)
+        {
+            throw new ClientException("A cancelled appointment cannot be paid.");
+        }
+        if (appointment.StateName == AppointmentStateNames.Pending)
+        {
+            throw new ClientException("The appointment can be paid only after the salon has confirmed it.");
+        }
+    }
+
+    private static PaymentQuoteResponse ToQuote(Appointment appointment, PaymentQuoteRequest request)
+    {
+        var tip = request.TipAmount ?? appointment.Price * (request.TipPercent ?? 0) / 100;
+        tip = Math.Round(tip, 2, MidpointRounding.AwayFromZero);
+        if (tip < 0)
+        {
+            throw new ClientException("The tip cannot be negative.");
+        }
+        if (tip > appointment.Price)
+        {
+            throw new ClientException("The tip cannot be more than the price of the service.");
+        }
+
+        var tax = Math.Round(appointment.Price * TaxRate, 2, MidpointRounding.AwayFromZero);
+        return new PaymentQuoteResponse
+        {
+            Subtotal = appointment.Price,
+            TaxRate = TaxRate,
+            Tax = tax,
+            Tip = tip,
+            Total = appointment.Price + tax + tip,
+            Currency = appointment.Salon.Currency
+        };
+    }
+
+    private static void ApplyQuote(Payment payment, PaymentQuoteResponse quote)
+    {
+        payment.Amount = quote.Total;
+        payment.TaxAmount = quote.Tax;
+        payment.TipAmount = quote.Tip;
+        payment.Currency = quote.Currency;
+    }
+
     private IQueryable<Appointment> AppointmentsWithPayment() =>
         _context.Appointments.Include(x => x.Payment).Include(x => x.Salon).Include(x => x.Service).Include(x => x.Customer);
 
@@ -314,7 +369,7 @@ public class PaymentService : IPaymentService
     {
         var matches = session.ClientReferenceId == appointment.Id.ToString()
             && session.AmountTotal == ToMinorUnits(payment.Amount)
-            && string.Equals(session.Currency, PaymentCurrency, StringComparison.OrdinalIgnoreCase);
+            && string.Equals(session.Currency, payment.Currency, StringComparison.OrdinalIgnoreCase);
         if (!matches)
         {
             _logger.LogWarning("Stripe session {SessionId} does not match appointment {AppointmentId}.", session.Id, appointment.Id);
@@ -333,7 +388,7 @@ public class PaymentService : IPaymentService
     private async Task NotifyPaymentReceivedAsync(Appointment appointment, Payment payment)
     {
         _notificationService.Add(appointment.CustomerId, "Payment received",
-            $"Your payment of {payment.Amount:C} for the appointment at {appointment.Salon.Name} was received.",
+            $"Your payment of {payment.Amount:F2} {payment.Currency} for the appointment at {appointment.Salon.Name} was received.",
             nameof(CutCal.Model.Enums.NotificationType.PaymentReceived));
         await _context.SaveChangesAsync();
 
@@ -342,7 +397,20 @@ public class PaymentService : IPaymentService
 
     private static long ToMinorUnits(decimal amount) => (long)Math.Round(amount * MinorUnitsPerCurrencyUnit, MidpointRounding.AwayFromZero);
 
+    /// <summary>Refund asked for through the API: an administrator may refund any payment, a manager only those of their own salon.</summary>
     public async Task<PaymentResponse> RefundAsync(int appointmentId)
+    {
+        var salonId = await _context.Appointments.Where(x => x.Id == appointmentId).Select(x => (int?)x.SalonId).FirstOrDefaultAsync()
+            ?? throw new ClientException("Appointment not found.");
+        await OwnershipGuard.EnsureManagesSalonAsync(_context, salonId, _userAccessor);
+
+        return await ExecuteRefundAsync(appointmentId);
+    }
+
+    /// <summary>The refund that follows a cancellation. The caller has already checked who may cancel, and a customer cancelling their own visit is not a manager.</summary>
+    public Task<PaymentResponse> RefundCancelledAppointmentAsync(int appointmentId) => ExecuteRefundAsync(appointmentId);
+
+    private async Task<PaymentResponse> ExecuteRefundAsync(int appointmentId)
     {
         var appointment = await _context.Appointments.Include(x => x.Payment).Include(x => x.Salon).Include(x => x.Customer).FirstOrDefaultAsync(x => x.Id == appointmentId)
             ?? throw new ClientException("Appointment not found.");
@@ -365,7 +433,7 @@ public class PaymentService : IPaymentService
         appointment.PaymentStatus = PaymentStatusNames.Refunded;
 
         _notificationService.Add(appointment.CustomerId, "Payment refunded",
-            $"Your payment of {payment.Amount:C} for the appointment at {appointment.Salon.Name} was refunded.",
+            $"Your payment of {payment.Amount:F2} {payment.Currency} for the appointment at {appointment.Salon.Name} was refunded.",
             nameof(CutCal.Model.Enums.NotificationType.PaymentRefunded));
         await _context.SaveChangesAsync();
 
@@ -401,7 +469,8 @@ public class PaymentService : IPaymentService
         CustomerName = appointment.Customer.FirstName,
         SalonName = appointment.Salon.Name,
         ScheduledAt = appointment.ScheduledAt,
-        Amount = amount
+        Amount = amount,
+        Currency = appointment.Salon.Currency
     };
 
     private static PaymentResponse MapPaymentResponse(Payment payment) => new()
@@ -411,6 +480,8 @@ public class PaymentService : IPaymentService
         PaypalOrderId = payment.PaypalOrderId,
         PaypalCaptureId = payment.PaypalCaptureId,
         Amount = payment.Amount,
+        TaxAmount = payment.TaxAmount,
+        TipAmount = payment.TipAmount,
         Currency = payment.Currency,
         Status = payment.Status,
         CreatedAt = payment.CreatedAt

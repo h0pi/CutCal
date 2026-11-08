@@ -1,10 +1,12 @@
 using CutCal.Model.Constants;
+using CutCal.Model.Exceptions;
 using CutCal.Model.Requests;
 using CutCal.Model.Responses;
 using CutCal.Model.SearchObjects;
 using CutCal.Services.Auth;
 using CutCal.Services.Base;
 using CutCal.Services.Database;
+using Microsoft.EntityFrameworkCore;
 
 namespace CutCal.Services.Services;
 
@@ -55,6 +57,17 @@ public class SalonServiceService : BaseCRUDService<SalonService, SalonServiceRes
     protected override Task BeforeUpdate(SalonService entity, SalonServiceUpdateRequest request)
         => OwnershipGuard.EnsureManagesSalonAsync(Context, entity.SalonId, _userAccessor);
 
-    protected override Task BeforeDelete(SalonService entity)
-        => OwnershipGuard.EnsureManagesSalonAsync(Context, entity.SalonId, _userAccessor);
+    protected override async Task BeforeDelete(SalonService entity)
+    {
+        await OwnershipGuard.EnsureManagesSalonAsync(Context, entity.SalonId, _userAccessor);
+
+        var appointments = await Context.Appointments.CountAsync(x => x.ServiceId == entity.Id);
+        if (appointments > 0)
+        {
+            throw new ClientException($"The service cannot be deleted because it has {appointments} appointment(s). Deactivate it instead.");
+        }
+
+        // Which staff perform the service is only a link, so it goes with the service.
+        Context.StaffServices.RemoveRange(Context.StaffServices.Where(x => x.ServiceId == entity.Id));
+    }
 }

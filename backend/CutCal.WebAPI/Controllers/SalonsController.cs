@@ -79,6 +79,13 @@ public class SalonsController : BaseCRUDController<SalonResponse, SalonSearchObj
     [Authorize(Roles = RoleNames.AdminOrManager)]
     public override Task<ActionResult<SalonResponse>> Update(int id, [FromBody] SalonUpdateRequest request) => base.Update(id, request);
 
+    [HttpPut("{id:int}/Settings")]
+    [Authorize(Roles = RoleNames.AdminOrManager)]
+    public async Task<ActionResult<SalonResponse>> UpdateSettings(int id, [FromBody] SalonSettingsRequest request)
+    {
+        return Ok(await Service.UpdateSettingsAsync(id, request));
+    }
+
     [HttpDelete("{id:int}")]
     [Authorize(Roles = RoleNames.Admin)]
     public override Task<IActionResult> Delete(int id) => base.Delete(id);

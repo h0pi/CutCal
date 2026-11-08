@@ -119,6 +119,8 @@ public class PaymentConfiguration : IEntityTypeConfiguration<Payment>
     {
         builder.HasOne(x => x.Appointment).WithOne(x => x.Payment).HasForeignKey<Payment>(x => x.AppointmentId).OnDelete(DeleteBehavior.Cascade);
         builder.Property(x => x.Amount).HasColumnType("decimal(18,2)");
+        builder.Property(x => x.TaxAmount).HasColumnType("decimal(18,2)");
+        builder.Property(x => x.TipAmount).HasColumnType("decimal(18,2)");
     }
 }
 

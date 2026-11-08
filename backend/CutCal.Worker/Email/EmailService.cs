@@ -40,10 +40,10 @@ public class EmailService : IEmailService
         $"Hi {message.CustomerName}, your appointment at {message.SalonName} has been moved to {message.ScheduledAt:f}.");
 
     public Task SendPaymentReceived(NotificationMessage message) => SendAsync(message, "Payment received",
-        $"Hi {message.CustomerName}, we received your payment of {message.Amount:0.00} for your appointment at {message.SalonName} on {message.ScheduledAt:f}. Thank you!");
+        $"Hi {message.CustomerName}, we received your payment of {message.Amount:0.00} {message.Currency} for your appointment at {message.SalonName} on {message.ScheduledAt:f}. Thank you!");
 
     public Task SendPaymentRefunded(NotificationMessage message) => SendAsync(message, "Payment refunded",
-        $"Hi {message.CustomerName}, your payment of {message.Amount:0.00} for the appointment at {message.SalonName} has been refunded.");
+        $"Hi {message.CustomerName}, your payment of {message.Amount:0.00} {message.Currency} for the appointment at {message.SalonName} has been refunded.");
 
     private async Task SendAsync(NotificationMessage notification, string subject, string body)
     {

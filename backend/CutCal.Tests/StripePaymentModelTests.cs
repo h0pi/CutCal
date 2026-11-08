@@ -27,21 +27,22 @@ public class StripePaymentModelTests
     }
 
     [Theory]
-    [InlineData(PaymentMethodNames.Cash)]
     [InlineData(PaymentMethodNames.PayPal)]
     [InlineData(PaymentMethodNames.Stripe)]
-    public void An_appointment_can_be_booked_with_cash_PayPal_or_Stripe(string paymentMethod)
+    public void An_appointment_can_be_booked_with_PayPal_or_Stripe(string paymentMethod)
     {
         Assert.True(new AppointmentInsertRequestValidator().Validate(Booking(paymentMethod)).IsValid);
     }
 
-    [Fact]
-    public void Any_other_payment_method_is_rejected_with_a_message_that_lists_the_three()
+    [Theory]
+    [InlineData(PaymentMethodNames.Cash)]
+    [InlineData("Bitcoin")]
+    public void Any_other_payment_method_including_cash_is_rejected_with_a_message_that_lists_the_two(string paymentMethod)
     {
-        var result = new AppointmentInsertRequestValidator().Validate(Booking("Bitcoin"));
+        var result = new AppointmentInsertRequestValidator().Validate(Booking(paymentMethod));
 
         Assert.False(result.IsValid);
-        Assert.Equal("Payment method must be Cash, PayPal or Stripe.", Assert.Single(result.Errors).ErrorMessage);
+        Assert.Equal("Payment method must be PayPal or Stripe.", Assert.Single(result.Errors).ErrorMessage);
     }
 
     [Fact]

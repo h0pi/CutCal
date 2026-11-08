@@ -25,11 +25,10 @@ public class AvailabilityController : ControllerBase
         [FromQuery] int serviceId,
         [FromQuery] int? staffId,
         [FromQuery] DateTime? from,
-        [FromQuery] int? days,
-        [FromQuery] DateTime? nowLocal)
+        [FromQuery] int? days)
     {
-        var start = from ?? nowLocal ?? DateTime.UtcNow;
-        return Ok(await _service.GetDaysAsync(salonId, serviceId, staffId, start, days ?? DefaultDaysRange, nowLocal));
+        var start = from ?? DateTime.UtcNow;
+        return Ok(await _service.GetDaysAsync(salonId, serviceId, staffId, start, days ?? DefaultDaysRange));
     }
 
     [HttpGet("Slots")]
@@ -38,9 +37,8 @@ public class AvailabilityController : ControllerBase
         [FromQuery] int serviceId,
         [FromQuery] int? staffId,
         [FromQuery] DateTime date,
-        [FromQuery] int? excludeAppointmentId,
-        [FromQuery] DateTime? nowLocal)
+        [FromQuery] int? excludeAppointmentId)
     {
-        return Ok(await _service.GetSlotsAsync(salonId, serviceId, staffId, date, excludeAppointmentId, nowLocal));
+        return Ok(await _service.GetSlotsAsync(salonId, serviceId, staffId, date, excludeAppointmentId));
     }
 }
